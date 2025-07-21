@@ -1,0 +1,2430 @@
+import { useState, useEffect, createContext, useContext } from 'react'
+import { initializeApp } from 'firebase/app'
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut,
+} from 'firebase/auth'
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  getDoc,
+  collection,
+  query,
+  onSnapshot,
+  deleteDoc,
+  serverTimestamp,
+  getDocs,
+  writeBatch,
+} from 'firebase/firestore'
+
+// Firebase Context to provide auth and db instances
+const FirebaseContext = createContext(null)
+
+// Utility to format date to YYYY-MM-DD
+const formatDate = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+// Firebase Configuration from Environment Variables
+// IMPORTANT: For Vite.js applications, environment variables must start with VITE_
+// Ensure your .env file variables are prefixed like VITE_FIREBASE_API_KEY
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+}
+
+// Main App Component
+const App = () => {
+  const [db, setDb] = useState(null)
+  const [auth, setAuth] = useState(null)
+  const [userId, setUserId] = useState(null)
+  const [isAuthReady, setIsAuthReady] = useState(false)
+  const [userCreatedAt, setUserCreatedAt] = useState(null) // Date object of user account creation
+  const [currentPage, setCurrentPage] = useState('calendar') // 'calendar', 'workoutLog', 'measurements', 'settings', 'statistics'
+  const [selectedDate, setSelectedDate] = useState(new Date()) // For daily workout log
+  const [selectedMonth, setSelectedMonth] = useState(new Date()) // For monthly measurements
+
+  useEffect(() => {
+    // Check if Firebase config is loaded
+    if (!firebaseConfig.apiKey) {
+      console.error(
+        'Firebase configuration is missing. Please check your .env file and ensure variables are prefixed with VITE_.'
+      )
+      setIsAuthReady(true) // Allow AuthPage to show error
+      return
+    }
+
+    // Initialize Firebase
+    try {
+      const app = initializeApp(firebaseConfig)
+      const firestoreDb = getFirestore(app)
+      const firebaseAuth = getAuth(app)
+
+      setDb(firestoreDb)
+      setAuth(firebaseAuth)
+
+      // Listen for auth state changes
+      const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
+        if (user) {
+          setUserId(user.uid)
+          // Use a fixed app ID for Firestore path as __app_id is not available locally
+          // For Vercel deployment, ensure this matches your Firestore rules or is set via env var.
+          const appId = 'workout-tracker-app-local' // Or any unique string for your local app
+          const userProfileRef = doc(
+            firestoreDb,
+            `artifacts/${appId}/users/${user.uid}/userProfile`,
+            'profile'
+          )
+          const userProfileSnap = await getDoc(userProfileRef)
+
+          if (userProfileSnap.exists()) {
+            setUserCreatedAt(userProfileSnap.data().createdAt?.toDate()) // Convert Firestore Timestamp to Date object
+          } else {
+            // If profile doesn't exist, create it with current timestamp
+            const now = serverTimestamp()
+            await setDoc(userProfileRef, { createdAt: now })
+            setUserCreatedAt(new Date()) // Set immediately for UI, Firestore will store precise server time
+          }
+        } else {
+          setUserId(null)
+          setUserCreatedAt(null)
+        }
+        setIsAuthReady(true)
+      })
+
+      return () => unsubscribe()
+    } catch (error) {
+      console.error('Failed to initialize Firebase:', error)
+      setIsAuthReady(true) // Allow AuthPage to show error
+    }
+  }, [])
+
+  if (!isAuthReady) {
+    return (
+      <div className='min-h-screen flex items-center justify-center bg-gray-900 text-gray-100 p-4'>
+        <div className='bg-gray-800 p-8 rounded-lg shadow-lg text-center'>
+          <p className='text-lg font-semibold text-gray-200'>
+            Loading application...
+          </p>
+          <p className='text-sm text-gray-400 mt-2'>
+            Initializing Firebase connection.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  const renderPage = () => {
+    if (!userId) {
+      return <AuthPage />
+    }
+    switch (currentPage) {
+      case 'calendar':
+        return (
+          <CalendarPage
+            setCurrentPage={setCurrentPage}
+            setSelectedDate={setSelectedDate}
+            userCreatedAt={userCreatedAt}
+          />
+        )
+      case 'workoutLog':
+        return (
+          <WorkoutLogPage
+            selectedDate={selectedDate}
+            setCurrentPage={setCurrentPage}
+          />
+        )
+      case 'measurements':
+        return (
+          <MeasurementsPage
+            setCurrentPage={setCurrentPage}
+            setSelectedMonth={setSelectedMonth}
+            selectedMonth={selectedMonth}
+          />
+        )
+      case 'statistics':
+        return <StatisticsPage setCurrentPage={setCurrentPage} />
+      case 'settings':
+        return <SettingsPage setCurrentPage={setCurrentPage} />
+      default:
+        return (
+          <CalendarPage
+            setCurrentPage={setCurrentPage}
+            setSelectedDate={setSelectedDate}
+            userCreatedAt={userCreatedAt}
+          />
+        )
+    }
+  }
+
+  return (
+    <FirebaseContext.Provider value={{ db, auth, userId, isAuthReady }}>
+      <div className='min-h-screen bg-gray-900 text-gray-100 font-inter'>
+        <header className='bg-gray-800 shadow-lg p-4 flex justify-between items-center rounded-b-xl'>
+          <h1 className='text-3xl font-extrabold text-blue-400 tracking-tight'>
+            <svg
+              width='32'
+              height='32'
+              viewBox='0 0 32 32'
+              fill='none'
+              xmlns='http://www.w3.org/2000/svg'
+            >
+              <circle
+                cx='16'
+                cy='16'
+                r='14'
+                stroke='#60A5FA'
+                stroke-width='2'
+              />
+
+              <circle cx='16' cy='16' r='6' fill='#60A5FA' />
+
+              <path
+                d='M11 21 L16 16 L21 21'
+                stroke='#60A5FA'
+                stroke-width='2'
+                stroke-linecap='round'
+                stroke-linejoin='round'
+              />
+            </svg> CoreTrack
+          </h1>
+          <div className='flex items-center space-x-4'>
+            {userId && (
+              <span className='text-sm text-gray-400'>
+                User ID:{' '}
+                <span className='font-mono text-blue-300'>{userId}</span>
+              </span>
+            )}
+            {/* Sign Out button moved to SettingsPage */}
+          </div>
+        </header>
+
+        {userId && ( // Only show navigation if logged in
+          <nav className='bg-gray-700 sticky top-5 text-white p-3 shadow-lg rounded-xl mx-4 mt-4 flex justify-around items-center shadow-[0_10px_0px_0px_#111827] '>
+            <NavItem
+              onClick={() => setCurrentPage('calendar')}
+              isActive={currentPage === 'calendar'}
+            >
+              📅 Calendar
+            </NavItem>
+            <NavItem
+              onClick={() => setCurrentPage('measurements')}
+              isActive={currentPage === 'measurements'}
+            >
+              📏 Measurements
+            </NavItem>
+            <NavItem
+              onClick={() => setCurrentPage('statistics')}
+              isActive={currentPage === 'statistics'}
+            >
+              📊 Statistics
+            </NavItem>
+            <NavItem
+              onClick={() => setCurrentPage('settings')}
+              isActive={currentPage === 'settings'}
+            >
+              ⚙️ Settings
+            </NavItem>
+          </nav>
+        )}
+
+        <main className='p-4'>{renderPage()}</main>
+      </div>
+    </FirebaseContext.Provider>
+  )
+}
+
+const NavItem = ({ children, onClick, isActive }) => (
+  <button
+    onClick={onClick}
+    className={`px-5 py-2 rounded-lg transition-all duration-300 ${
+      isActive
+        ? 'bg-gray-900 text-blue-400 shadow-md font-semibold'
+        : 'hover:bg-gray-600 text-gray-200 hover:text-white'
+    }`}
+  >
+    {children}
+  </button>
+)
+
+// Auth Page Component (NEW)
+const AuthPage = () => {
+  const { auth, db } = useContext(FirebaseContext)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [isRegistering, setIsRegistering] = useState(true) // Start with register view
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState('')
+  const [messageType, setMessageType] = useState('') // 'success' or 'error'
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  // Use a fixed app ID for Firestore path as __app_id is not available locally
+  const appId = 'workout-tracker-app-local' // Or any unique string for your local app
+
+  const handleAuthAction = async () => {
+    setMessage('')
+    setMessageType('')
+    setLoading(true)
+    try {
+      if (!auth) {
+        throw new Error(
+          'Firebase Auth is not initialized. Check your .env config.'
+        )
+      }
+      if (isRegistering) {
+        if (password !== confirmPassword) {
+          throw new Error('Passwords do not match.')
+        }
+        await createUserWithEmailAndPassword(auth, email, password)
+        setMessage('Registration successful! You are now logged in.')
+        setMessageType('success')
+      } else {
+        await signInWithEmailAndPassword(auth, email, password)
+        setMessage('Login successful!')
+        setMessageType('success')
+      }
+      // User profile creation date is handled by onAuthStateChanged in App.js
+    } catch (error) {
+      console.error('Authentication error:', error)
+      setMessageType('error')
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          setMessage(
+            'Email already in use. Try logging in or use a different email.'
+          )
+          break
+        case 'auth/invalid-email':
+          setMessage('Invalid email address format.')
+          break
+        case 'auth/weak-password':
+          setMessage('Password is too weak. Must be at least 6 characters.')
+          break
+        case 'auth/user-not-found':
+        case 'auth/wrong-password':
+          setMessage('Invalid email or password.')
+          break
+        case 'auth/network-request-failed':
+          setMessage('Network error. Please check your internet connection.')
+          break
+        default:
+          setMessage(
+            error.message || 'An unexpected authentication error occurred.'
+          )
+          break
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className='flex items-center justify-center min-h-[calc(100vh-10rem)] p-4'>
+      <div className='bg-gray-800 p-8 rounded-xl shadow-lg w-full max-w-md text-gray-100'>
+        <h2 className='text-2xl font-bold text-blue-400 mb-6 text-center'>
+          {isRegistering ? 'Register' : 'Login'}
+        </h2>
+
+        {message && (
+          <div
+            className={`p-3 mb-4 rounded-md text-center ${
+              messageType === 'success'
+                ? 'bg-green-800 text-green-200'
+                : 'bg-red-800 text-red-200'
+            }`}
+          >
+            {message}
+          </div>
+        )}
+
+        <div className='space-y-4 mb-6'>
+          <input
+            type='email'
+            placeholder='Email'
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className='p-3 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
+            disabled={loading}
+          />
+          <div className='relative'>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder='Password'
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className='p-3 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 pr-10'
+              disabled={loading}
+            />
+            <button
+              type='button'
+              onClick={() => setShowPassword(!showPassword)}
+              className='absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-gray-400 hover:text-gray-200'
+            >
+              {showPassword ? '🙈' : '👁️'}
+            </button>
+          </div>
+          {isRegistering && (
+            <div className='relative'>
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                placeholder='Confirm Password'
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className='p-3 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 pr-10'
+                disabled={loading}
+              />
+              <button
+                type='button'
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className='absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-gray-400 hover:text-gray-200'
+              >
+                {showConfirmPassword ? '🙈' : '👁️'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={handleAuthAction}
+          className='w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm font-semibold'
+          disabled={loading}
+        >
+          {loading ? 'Processing...' : isRegistering ? 'Register' : 'Login'}
+        </button>
+
+        <p className='text-center text-gray-400 mt-4'>
+          {isRegistering
+            ? 'Already have an account?'
+            : "Don't have an account?"}{' '}
+          <button
+            onClick={() => setIsRegistering(!isRegistering)}
+            className='text-blue-400 hover:underline font-medium'
+            disabled={loading}
+          >
+            {isRegistering ? 'Login' : 'Register'}
+          </button>
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// Calendar Page Component
+const CalendarPage = ({ setCurrentPage, setSelectedDate, userCreatedAt }) => {
+  const { db, userId, isAuthReady } = useContext(FirebaseContext)
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [calendarData, setCalendarData] = useState({}) // { 'YYYY-MM-DD': { type: 'workout' | 'rest', exercises: [] } }
+  const [calendarSettings, setCalendarSettings] = useState({
+    workoutDaysOfWeek: [1, 2, 3, 4, 5], // Monday=1, Sunday=0
+    restDaysOfWeek: [0, 6], // Sunday=0, Saturday=6
+  })
+  const [message, setMessage] = useState('')
+  const [messageType, setMessageType] = useState('') // 'success' or 'error'
+  const [showDayActionsModal, setShowDayActionsModal] = useState(false)
+  const [selectedDayData, setSelectedDayData] = useState(null) // Data for the day clicked to open modal
+  const [searchDate, setSearchDate] = useState('')
+  const [highlightedDate, setHighlightedDate] = useState(null) // YYYY-MM-DD string for highlighting
+
+  // Use a fixed app ID for Firestore path as __app_id is not available locally
+  const appId = 'workout-tracker-app-local' // Or any unique string for your local app
+
+  useEffect(() => {
+    if (!db || !userId || !isAuthReady) return
+
+    // Fetch calendar settings
+    const userSettingsDocRef = doc(
+      db,
+      `artifacts/${appId}/users/${userId}/calendarSettings`,
+      'settings'
+    )
+    const unsubscribeSettings = onSnapshot(
+      userSettingsDocRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setCalendarSettings(docSnap.data())
+        } else {
+          // Set default settings if none exist
+          setDoc(userSettingsDocRef, calendarSettings, { merge: true }).catch(
+            (e) => console.error('Error setting default calendar settings:', e)
+          )
+        }
+      },
+      (error) => {
+        console.error('Error fetching calendar settings:', error)
+        setMessage('Error loading calendar settings.')
+        setMessageType('error')
+      }
+    )
+
+    // Fetch all workout data
+    const workoutsCollectionRef = collection(
+      db,
+      `artifacts/${appId}/users/${userId}/workouts`
+    )
+    const unsubscribeWorkouts = onSnapshot(
+      workoutsCollectionRef,
+      (snapshot) => {
+        const fetchedData = {}
+        snapshot.forEach((doc) => {
+          const data = doc.data()
+          fetchedData[doc.id] = {
+            type: data.type || 'rest', // Default to rest if not explicitly set
+            exercises: data.exercises || [],
+          }
+        })
+        setCalendarData(fetchedData)
+      },
+      (error) => {
+        console.error('Error fetching workout data:', error)
+        setMessage('Error loading workout data.')
+        setMessageType('error')
+      }
+    )
+
+    return () => {
+      unsubscribeSettings()
+      unsubscribeWorkouts()
+    }
+  }, [db, userId, isAuthReady, appId])
+
+  const daysInMonth = (date) =>
+    new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+  const firstDayOfMonth = (date) =>
+    new Date(date.getFullYear(), date.getMonth(), 1).getDay() // 0 for Sunday, 1 for Monday
+
+  const getDayTypeFromSettings = (date) => {
+    const dayOfWeek = date.getDay() // 0 for Sunday, 1 for Monday
+    if (calendarSettings.workoutDaysOfWeek.includes(dayOfWeek)) {
+      return 'workout'
+    }
+    if (calendarSettings.restDaysOfWeek.includes(dayOfWeek)) {
+      return 'rest'
+    }
+    return 'none' // Neither planned workout nor rest, should ideally not happen if all days are covered
+  }
+
+  const handleDayClick = (day) => {
+    const date = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth(),
+      day
+    )
+    const dateKey = formatDate(date)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0) // Normalize today's date
+
+    // Normalize userCreatedAt to start of day for accurate comparison
+    const userCreatedDateNormalized = userCreatedAt
+      ? new Date(
+          userCreatedAt.getFullYear(),
+          userCreatedAt.getMonth(),
+          userCreatedAt.getDate()
+        )
+      : null
+
+    // Disable interaction for future dates or dates before account creation
+    if (
+      date > today ||
+      (userCreatedDateNormalized && date < userCreatedDateNormalized)
+    ) {
+      return
+    }
+
+    const storedData = calendarData[dateKey]
+    const plannedType = getDayTypeFromSettings(date)
+    const effectiveType = storedData?.type || plannedType
+    const hasWorkoutLogged = (storedData?.exercises?.length || 0) > 0
+
+    setSelectedDate(date)
+    setSelectedDayData({ date, dateKey, effectiveType, hasWorkoutLogged })
+    setShowDayActionsModal(true)
+  }
+
+  const handleChangeDayType = async (dateKey, newType) => {
+    if (!db || !userId) return
+    const workoutDocRef = doc(
+      db,
+      `artifacts/${appId}/users/${userId}/workouts`,
+      dateKey
+    )
+    try {
+      await setDoc(workoutDocRef, { type: newType }, { merge: true }) // Just update type, exercises remain
+      setMessage(`Day converted to ${newType} day!`)
+      setMessageType('success')
+      setShowDayActionsModal(false)
+    } catch (e) {
+      console.error('Error changing day type:', e)
+      setMessage('Failed to change day type.')
+      setMessageType('error')
+    }
+  }
+
+  const handleSearchDate = () => {
+    if (!searchDate) {
+      setMessage('Please enter a date to search.')
+      setMessageType('error')
+      return
+    }
+    const [year, month, day] = searchDate.split('-').map(Number)
+    const targetDate = new Date(year, month - 1, day) // Month is 0-indexed
+    if (isNaN(targetDate.getTime())) {
+      setMessage('Invalid date format. Please use YYYY-MM-DD.')
+      setMessageType('error')
+      return
+    }
+
+    setCurrentMonth(targetDate)
+    setHighlightedDate(formatDate(targetDate)) // Set highlight
+    setTimeout(() => {
+      setHighlightedDate(null) // Remove highlight after 10 seconds
+    }, 10000)
+  }
+
+  const renderDays = () => {
+    const totalDays = daysInMonth(currentMonth)
+    const firstDay = firstDayOfMonth(currentMonth)
+    const days = []
+    const today = new Date()
+    today.setHours(0, 0, 0, 0) // Normalize today's date
+
+    const userCreatedDateNormalized = userCreatedAt
+      ? new Date(
+          userCreatedAt.getFullYear(),
+          userCreatedAt.getMonth(),
+          userCreatedAt.getDate()
+        )
+      : null
+
+    // Fill leading empty days
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className='p-2 text-center'></div>)
+    }
+
+    // Fill actual days
+    for (let day = 1; day <= totalDays; day++) {
+      const date = new Date(
+        currentMonth.getFullYear(),
+        currentMonth.getMonth(),
+        day
+      )
+      const dateKey = formatDate(date)
+
+      const storedData = calendarData[dateKey]
+      const plannedType = getDayTypeFromSettings(date)
+
+      let effectiveType = storedData?.type || plannedType
+      const hasWorkoutLogged = (storedData?.exercises?.length || 0) > 0
+
+      let bgColor = 'bg-gray-700'
+      let borderColor = 'border-gray-600'
+      let textColor = 'text-gray-100'
+      let statusEmoji = ''
+
+      const isFutureDate = date > today
+      const isBeforeAccountCreation =
+        userCreatedDateNormalized && date < userCreatedDateNormalized
+      const isToday = date.toDateString() === today.toDateString()
+      const isHighlighted = highlightedDate === dateKey
+
+      if (isFutureDate || isBeforeAccountCreation) {
+        bgColor = 'bg-gray-900'
+        borderColor = 'border-gray-800'
+        textColor = 'text-gray-600'
+        statusEmoji = isFutureDate ? '⏳' : '🚫'
+      } else {
+        if (effectiveType === 'workout') {
+          if (hasWorkoutLogged) {
+            bgColor = 'bg-green-700'
+            borderColor = 'border-green-600'
+            statusEmoji = '✅'
+          } else {
+            bgColor = 'bg-red-700'
+            borderColor = 'border-red-600'
+            statusEmoji = '❌'
+          }
+        } else if (effectiveType === 'rest') {
+          bgColor = 'bg-yellow-700'
+          borderColor = 'border-yellow-600'
+          statusEmoji = '🛌'
+        }
+      }
+
+      days.push(
+        <div
+          key={day}
+          className={`relative p-3 border rounded-lg shadow-md flex flex-col items-center justify-center transition-all duration-200
+            ${bgColor} ${borderColor} ${
+            isFutureDate || isBeforeAccountCreation
+              ? 'cursor-not-allowed opacity-60'
+              : 'cursor-pointer hover:shadow-lg hover:scale-[1.02]'
+          }
+            ${isToday ? 'ring-2 ring-blue-400' : ''}
+            ${isHighlighted ? 'ring-4 ring-blue-500' : ''}
+          `}
+          onClick={() => handleDayClick(day)}
+        >
+          <span className={`text-lg font-bold ${textColor}`}>{day}</span>
+          <span className='text-sm mt-1'>{statusEmoji}</span>
+        </div>
+      )
+    }
+    return days
+  }
+
+  const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+  return (
+    <div className='bg-gray-800 p-6 rounded-xl shadow-lg text-gray-100'>
+      <h2 className='text-2xl font-bold text-blue-400 mb-6'>
+        📅 Workout Calendar
+      </h2>
+
+      {message && (
+        <div
+          className={`p-3 mb-4 rounded-md text-center ${
+            messageType === 'success'
+              ? 'bg-green-800 text-green-200'
+              : 'bg-red-800 text-red-200'
+          }`}
+        >
+          {message}
+        </div>
+      )}
+
+      <div className='flex justify-between items-center mb-6'>
+        <button
+          onClick={() =>
+            setCurrentMonth(
+              new Date(
+                currentMonth.getFullYear(),
+                currentMonth.getMonth() - 1,
+                1
+              )
+            )
+          }
+          className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm'
+        >
+          Previous
+        </button>
+        <h3 className='text-xl font-semibold text-gray-200'>
+          {currentMonth.toLocaleString('default', {
+            month: 'long',
+            year: 'numeric',
+          })}
+        </h3>
+        <button
+          onClick={() =>
+            setCurrentMonth(
+              new Date(
+                currentMonth.getFullYear(),
+                currentMonth.getMonth() + 1,
+                1
+              )
+            )
+          }
+          className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm'
+        >
+          Next
+        </button>
+      </div>
+
+      <div className='mb-6 flex flex-col sm:flex-row gap-3'>
+        <input
+          type='date'
+          value={searchDate}
+          onChange={(e) => setSearchDate(e.target.value)}
+          className='flex-grow p-3 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
+        />
+        <button
+          onClick={handleSearchDate}
+          className='px-4 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-sm'
+        >
+          🔍 Go to Date
+        </button>
+      </div>
+
+      <div className='grid grid-cols-7 gap-3 mb-4'>
+        {daysOfWeek.map((day) => (
+          <div key={day} className='font-semibold text-center text-gray-400'>
+            {day}
+          </div>
+        ))}
+      </div>
+
+      <div className='grid grid-cols-7 gap-3'>{renderDays()}</div>
+
+      {showDayActionsModal && selectedDayData && (
+        <DayActionsModal
+          date={selectedDayData.date}
+          effectiveType={selectedDayData.effectiveType}
+          hasWorkoutLogged={selectedDayData.hasWorkoutLogged}
+          onClose={() => setShowDayActionsModal(false)}
+          onLogWorkout={() => {
+            setSelectedDate(selectedDayData.date)
+            setCurrentPage('workoutLog')
+            setShowDayActionsModal(false)
+          }}
+          onConvertDayType={(newType) =>
+            handleChangeDayType(selectedDayData.dateKey, newType)
+          }
+        />
+      )}
+    </div>
+  )
+}
+
+// Day Actions Modal Component
+const DayActionsModal = ({
+  date,
+  effectiveType,
+  hasWorkoutLogged,
+  onClose,
+  onLogWorkout,
+  onConvertDayType,
+}) => {
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [confirmAction, setConfirmAction] = useState(null)
+  const [confirmMessage, setConfirmMessage] = useState('')
+
+  const handleConfirmAction = (action, message) => {
+    setConfirmAction(() => action)
+    setConfirmMessage(message)
+    setShowConfirmModal(true)
+  }
+
+  const executeConfirmAction = () => {
+    if (confirmAction) {
+      confirmAction()
+    }
+    setShowConfirmModal(false)
+    setConfirmAction(null)
+    setConfirmMessage('')
+  }
+
+  return (
+    <Modal onClose={onClose}>
+      <h3 className='text-xl font-bold text-blue-400 mb-4'>
+        Actions for {date.toDateString()}
+      </h3>
+      <div className='mb-6'>
+        <p className='text-gray-200'>
+          Current Status:
+          <span
+            className={`font-semibold ml-2 ${
+              effectiveType === 'workout' && hasWorkoutLogged
+                ? 'text-green-400'
+                : effectiveType === 'workout' && !hasWorkoutLogged
+                ? 'text-red-400'
+                : effectiveType === 'rest'
+                ? 'text-yellow-400'
+                : 'text-gray-400'
+            }`}
+          >
+            {effectiveType === 'workout' && hasWorkoutLogged
+              ? 'Workout Done ✅'
+              : effectiveType === 'workout' && !hasWorkoutLogged
+              ? 'Workout Undone ❌'
+              : effectiveType === 'rest'
+              ? 'Rest Day 🛌'
+              : 'Unassigned ❓'}
+          </span>
+        </p>
+      </div>
+      <div className='flex flex-col space-y-3'>
+        {effectiveType === 'workout' && (
+          <button
+            onClick={onLogWorkout}
+            className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm w-full'
+          >
+            📝 Log Workout
+          </button>
+        )}
+
+        {effectiveType === 'workout' ? (
+          <button
+            onClick={() =>
+              handleConfirmAction(
+                () => onConvertDayType('rest'),
+                'Are you sure you want to convert this to a REST day? Any logged workouts will remain but the day will be marked as rest.'
+              )
+            }
+            className='px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors shadow-sm w-full'
+          >
+            🔄 Convert to Rest Day
+          </button>
+        ) : (
+          <button
+            onClick={() =>
+              handleConfirmAction(
+                () => onConvertDayType('workout'),
+                'Are you sure you want to convert this to a WORKOUT day?'
+              )
+            }
+            className='px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-sm w-full'
+          >
+            🔄 Convert to Workout Day
+          </button>
+        )}
+      </div>
+
+      {showConfirmModal && (
+        <Modal onClose={() => setShowConfirmModal(false)}>
+          <h3 className='text-xl font-bold text-blue-400 mb-4'>
+            Confirm Action
+          </h3>
+          <p className='text-gray-200 mb-6'>{confirmMessage}</p>
+          <div className='flex justify-end space-x-3'>
+            <button
+              onClick={() => setShowConfirmModal(false)}
+              className='px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors'
+            >
+              Cancel
+            </button>
+            <button
+              onClick={executeConfirmAction}
+              className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors'
+            >
+              Confirm
+            </button>
+          </div>
+        </Modal>
+      )}
+    </Modal>
+  )
+}
+
+// Workout Log Page Component
+const WorkoutLogPage = ({ selectedDate, setCurrentPage }) => {
+  const { db, userId, isAuthReady } = useContext(FirebaseContext)
+  const [exercises, setExercises] = useState([])
+  const [currentExerciseName, setCurrentExerciseName] = useState('')
+  const [currentSets, setCurrentSets] = useState([]) // Array of { reps, weight, restTime } for the current exercise being added
+  const [message, setMessage] = useState('')
+  const [messageType, setMessageType] = useState('') // 'success' or 'error'
+
+  const formattedDate = formatDate(selectedDate) // YYYY-MM-DD
+  // Use a fixed app ID for Firestore path as __app_id is not available locally
+  const appId = 'workout-tracker-app-local' // Or any unique string for your local app
+
+  useEffect(() => {
+    if (!db || !userId || !isAuthReady) return
+
+    const workoutDocRef = doc(
+      db,
+      `artifacts/${appId}/users/${userId}/workouts`,
+      formattedDate
+    )
+    const unsubscribe = onSnapshot(
+      workoutDocRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data()
+          setExercises(data.exercises || [])
+        } else {
+          setExercises([])
+        }
+      },
+      (error) => {
+        console.error('Error fetching workout log:', error)
+        setMessage('Error loading workout log.')
+        setMessageType('error')
+      }
+    )
+
+    return () => unsubscribe()
+  }, [db, userId, isAuthReady, formattedDate, appId])
+
+  const handleAddSet = () => {
+    setCurrentSets([...currentSets, { reps: '', weight: '', restTime: '' }])
+  }
+
+  const handleUpdateSet = (index, field, value) => {
+    const updatedSets = [...currentSets]
+    updatedSets[index][field] = value
+    setCurrentSets(updatedSets)
+  }
+
+  const handleDeleteSet = (index) => {
+    const updatedSets = currentSets.filter((_, i) => i !== index)
+    setCurrentSets(updatedSets)
+  }
+
+  const handleAddExercise = async () => {
+    if (!currentExerciseName.trim()) {
+      setMessage('Exercise name cannot be empty.')
+      setMessageType('error')
+      return
+    }
+    if (currentSets.length === 0) {
+      setMessage('Please add at least one set for the exercise.')
+      setMessageType('error')
+      return
+    }
+
+    const newExercise = {
+      id: Date.now(), // Unique ID for the exercise
+      name: currentExerciseName.trim(),
+      sets: currentSets.map((s) => ({
+        reps: parseInt(s.reps) || 0,
+        weight: parseFloat(s.weight) || 0,
+        restTime: s.restTime.trim(),
+      })),
+    }
+
+    const updatedExercises = [...exercises, newExercise]
+    setExercises(updatedExercises) // Optimistic update
+
+    const workoutDocRef = doc(
+      db,
+      `artifacts/${appId}/users/${userId}/workouts`,
+      formattedDate
+    )
+    try {
+      // Ensure the day is marked as 'workout' type
+      await setDoc(
+        workoutDocRef,
+        { exercises: updatedExercises, type: 'workout' },
+        { merge: true }
+      )
+      setMessage('Exercise added successfully!')
+      setMessageType('success')
+      // Clear form
+      setCurrentExerciseName('')
+      setCurrentSets([])
+    } catch (e) {
+      console.error('Error adding exercise:', e)
+      setMessage('Failed to add exercise.')
+      setMessageType('error')
+      setExercises(exercises) // Revert if error
+    }
+  }
+
+  const handleDeleteExercise = async (idToDelete) => {
+    if (!db || !userId) return
+    const updatedExercises = exercises.filter((ex) => ex.id !== idToDelete)
+    setExercises(updatedExercises) // Optimistic update
+
+    const workoutDocRef = doc(
+      db,
+      `artifacts/${appId}/users/${userId}/workouts`,
+      formattedDate
+    )
+    try {
+      // If no exercises left, the calendar will automatically show it as 'undone'
+      await setDoc(
+        workoutDocRef,
+        { exercises: updatedExercises },
+        { merge: true }
+      )
+      setMessage('Exercise deleted successfully!')
+      setMessageType('success')
+    } catch (e) {
+      console.error('Error deleting exercise:', e)
+      setMessage('Failed to delete exercise.')
+      setMessageType('error')
+      setExercises(exercises) // Revert if error
+    }
+  }
+
+  return (
+    <div className='bg-gray-800 p-6 rounded-xl shadow-lg text-gray-100'>
+      <h2 className='text-2xl font-bold text-blue-400 mb-4'>
+        🏋️ Workout Log for {selectedDate.toDateString()}
+      </h2>
+
+      {message && (
+        <div
+          className={`p-3 mb-4 rounded-md text-center ${
+            messageType === 'success'
+              ? 'bg-green-800 text-green-200'
+              : 'bg-red-800 text-red-200'
+          }`}
+        >
+          {message}
+        </div>
+      )}
+
+      <div className='mb-6 bg-gray-700 p-4 rounded-lg shadow-inner'>
+        <h3 className='text-xl font-semibold text-gray-200 mb-3'>
+          Add New Exercise
+        </h3>
+        <input
+          type='text'
+          placeholder='Exercise Name (e.g., Bench Press)'
+          value={currentExerciseName}
+          onChange={(e) => setCurrentExerciseName(e.target.value)}
+          className='p-3 mb-3 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
+        />
+
+        <div className='space-y-2 mb-3'>
+          {currentSets.map((set, index) => (
+            <div
+              key={index}
+              className='grid grid-cols-4 gap-2 items-center bg-gray-800 p-3 rounded-md'
+            >
+              <span className='text-gray-300 font-medium'>
+                Set {index + 1}:
+              </span>
+              <input
+                type='number'
+                placeholder='Reps'
+                value={set.reps}
+                onChange={(e) => handleUpdateSet(index, 'reps', e.target.value)}
+                className='p-2 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
+              />
+              <input
+                type='number'
+                step='0.1'
+                placeholder='Weight (kg)'
+                value={set.weight}
+                onChange={(e) =>
+                  handleUpdateSet(index, 'weight', e.target.value)
+                }
+                className='p-2 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
+              />
+              <div className='flex items-center space-x-2'>
+                <input
+                  type='text'
+                  placeholder='Rest (e.g., 60s)'
+                  value={set.restTime}
+                  onChange={(e) =>
+                    handleUpdateSet(index, 'restTime', e.target.value)
+                  }
+                  className='p-2 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 flex-grow'
+                />
+                <button
+                  onClick={() => handleDeleteSet(index)}
+                  className='p-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-sm'
+                >
+                  🗑️
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={handleAddSet}
+          className='px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-sm mb-4 w-full'
+        >
+          ➕ Add Set
+        </button>
+
+        <button
+          onClick={handleAddExercise}
+          className='px-4 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-sm w-full'
+        >
+          Add Exercise to Log
+        </button>
+      </div>
+
+      <div className='mb-6'>
+        <h3 className='text-xl font-semibold text-gray-200 mb-3'>
+          Logged Exercises
+        </h3>
+        {exercises.length === 0 ? (
+          <p className='text-gray-400'>No exercises logged for this day yet.</p>
+        ) : (
+          <div className='space-y-4'>
+            {exercises.map((exercise) => (
+              <div
+                key={exercise.id}
+                className='bg-gray-700 p-4 rounded-lg shadow-md'
+              >
+                <div className='flex justify-between items-center mb-2'>
+                  <p className='font-semibold text-blue-300 text-lg'>
+                    {exercise.name}
+                  </p>
+                  <button
+                    onClick={() => handleDeleteExercise(exercise.id)}
+                    className='px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-sm text-sm'
+                  >
+                    🗑️ Delete Exercise
+                  </button>
+                </div>
+                <div className='space-y-1'>
+                  {exercise.sets.map((set, index) => (
+                    <p key={index} className='text-sm text-gray-300'>
+                      Set {index + 1}: {set.reps} reps @ {set.weight} kg{' '}
+                      {set.restTime && `(Rest: ${set.restTime})`}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className='mt-8 text-center'>
+        <button
+          onClick={() => setCurrentPage('calendar')}
+          className='px-6 py-3 bg-gray-600 text-gray-100 rounded-lg hover:bg-gray-700 transition-colors shadow-md'
+        >
+          ⬅️ Back to Calendar
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Measurements Page Component
+const MeasurementsPage = ({
+  setCurrentPage,
+  selectedMonth,
+  setSelectedMonth,
+}) => {
+  const { db, userId, isAuthReady } = useContext(FirebaseContext)
+  const [measurements, setMeasurements] = useState({}) // { 'YYYY-MM-01': { data } }
+  const [showMeasurementModal, setShowMeasurementModal] = useState(false)
+  const [currentMonthData, setCurrentMonthData] = useState(null) // Data for the month being viewed/edited
+  const [message, setMessage] = useState('')
+  const [messageType, setMessageType] = useState('') // 'success' or 'error'
+  const [searchYear, setSearchYear] = useState(new Date().getFullYear())
+  const [searchMonth, setSearchMonth] = useState(new Date().getMonth() + 1) // 1-indexed month
+  const [highlightedMonth, setHighlightedMonth] = useState(null) // YYYY-MM-01 string for highlighting
+
+  // Use a fixed app ID for Firestore path as __app_id is not available locally
+  const appId = 'workout-tracker-app-local' // Or any unique string for your local app
+
+  // Helper to check if measurement data is effectively empty
+  const isEmptyMeasurementData = (data) => {
+    if (!data) return true // No data at all means empty
+
+    // Check numerical fields
+    const numericFields = [
+      'weight',
+      'bodyFat',
+      'chest',
+      'waist',
+      'neck',
+      'forearms',
+      'arms',
+      'hips',
+      'legs',
+      'calves',
+    ]
+    const hasNumericData = numericFields.some((field) => {
+      const value = data[field]
+      // Consider 0 as data if it's explicitly set, but empty string/null/undefined as empty
+      return (
+        value !== '' &&
+        value !== null &&
+        value !== undefined &&
+        (typeof value === 'number' ? value !== 0 : true)
+      )
+    })
+
+    // Check notes
+    const hasNotes = data.notes && data.notes.trim() !== ''
+
+    // Check image URLs
+    const hasImageUrls =
+      data.imageUrls &&
+      data.imageUrls.some((img) => img.url && img.url.trim() !== '')
+
+    return !(hasNumericData || hasNotes || hasImageUrls)
+  }
+
+  useEffect(() => {
+    if (!db || !userId || !isAuthReady) return
+
+    const measurementsCollectionRef = collection(
+      db,
+      `artifacts/${appId}/users/${userId}/measurements`
+    )
+    const unsubscribe = onSnapshot(
+      measurementsCollectionRef,
+      (snapshot) => {
+        const fetchedMeasurements = {}
+        snapshot.forEach((doc) => {
+          fetchedMeasurements[doc.id] = doc.data()
+        })
+        setMeasurements(fetchedMeasurements)
+      },
+      (error) => {
+        console.error('Error fetching measurements:', error)
+        setMessage('Error loading measurements.')
+        setMessageType('error')
+      }
+    )
+
+    return () => unsubscribe()
+  }, [db, userId, isAuthReady, appId])
+
+  const handleMonthClick = (monthIndex) => {
+    // monthIndex is 0-indexed
+    const date = new Date(selectedMonth.getFullYear(), monthIndex, 1)
+    const today = new Date()
+    today.setDate(1) // Normalize to 1st of current month for comparison
+    today.setHours(0, 0, 0, 0)
+
+    // Disable interaction for future months
+    if (date > today) {
+      return
+    }
+
+    const dateKey = formatDate(date) // YYYY-MM-01
+
+    setCurrentMonthData(
+      measurements[dateKey] || {
+        date: dateKey,
+        weight: '',
+        bodyFat: '',
+        chest: '',
+        waist: '',
+        neck: '',
+        forearms: '',
+        arms: '',
+        hips: '',
+        legs: '',
+        calves: '',
+        notes: '',
+        imageUrls: [],
+      }
+    )
+    setShowMeasurementModal(true)
+  }
+
+  const handleSearchMonth = () => {
+    const newDate = new Date(searchYear, searchMonth - 1, 1)
+    if (isNaN(newDate.getTime())) {
+      setMessage('Invalid year or month.')
+      setMessageType('error')
+      return
+    }
+    setSelectedMonth(newDate)
+    setHighlightedMonth(formatDate(newDate)) // Set highlight
+    setTimeout(() => {
+      setHighlightedMonth(null) // Remove highlight after 10 seconds
+    }, 10000)
+  }
+
+  const months = Array.from({ length: 12 }, (_, i) =>
+    new Date(0, i).toLocaleString('default', { month: 'long' })
+  )
+
+  return (
+    <div className='bg-gray-800 p-6 rounded-xl shadow-lg text-gray-100'>
+      <h2 className='text-2xl font-bold text-blue-400 mb-6'>
+        📏 Monthly Measurements
+      </h2>
+
+      {message && (
+        <div
+          className={`p-3 mb-4 rounded-md text-center ${
+            messageType === 'success'
+              ? 'bg-green-800 text-green-200'
+              : 'bg-red-800 text-red-200'
+          }`}
+        >
+          {message}
+        </div>
+      )}
+
+      <div className='flex justify-between items-center mb-6'>
+        <button
+          onClick={() =>
+            setSelectedMonth(
+              new Date(
+                selectedMonth.getFullYear() - 1,
+                selectedMonth.getMonth(),
+                1
+              )
+            )
+          }
+          className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm'
+        >
+          Previous Year
+        </button>
+        <h3 className='text-xl font-semibold text-gray-200'>
+          {selectedMonth.getFullYear()}
+        </h3>
+        <button
+          onClick={() =>
+            setSelectedMonth(
+              new Date(
+                selectedMonth.getFullYear() + 1,
+                selectedMonth.getMonth(),
+                1
+              )
+            )
+          }
+          className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm'
+        >
+          Next Year
+        </button>
+      </div>
+
+      <div className='mb-6 flex flex-col sm:flex-row gap-3'>
+        <input
+          type='number'
+          placeholder='Year'
+          value={searchYear}
+          onChange={(e) => setSearchYear(parseInt(e.target.value) || '')}
+          className='p-3 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 flex-grow'
+        />
+        <select
+          value={searchMonth}
+          onChange={(e) => setSearchMonth(parseInt(e.target.value))}
+          className='p-3 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 flex-grow'
+        >
+          {months.map((month, index) => (
+            <option key={month} value={index + 1}>
+              {month}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={handleSearchMonth}
+          className='px-4 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-sm'
+        >
+          🔍 Go to Month
+        </button>
+      </div>
+
+      <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'>
+        {months.map((monthName, index) => {
+          const monthDate = new Date(selectedMonth.getFullYear(), index, 1)
+          const monthKey = formatDate(monthDate)
+          // Check if data exists AND is not empty
+          const hasMeaningfulMeasurements = !isEmptyMeasurementData(
+            measurements[monthKey]
+          )
+
+          const today = new Date()
+          today.setDate(1) // Normalize to 1st of current month for comparison
+          today.setHours(0, 0, 0, 0)
+          const isFutureMonth = monthDate > today
+          const isHighlighted = highlightedMonth === monthKey
+
+          return (
+            <div
+              key={monthName}
+              className={`p-4 rounded-lg shadow-md flex flex-col items-center justify-center transition-all duration-200
+                ${
+                  hasMeaningfulMeasurements
+                    ? 'bg-green-700 hover:bg-green-600'
+                    : 'bg-gray-700 hover:bg-gray-600'
+                }
+                ${
+                  isFutureMonth
+                    ? 'cursor-not-allowed opacity-60'
+                    : 'cursor-pointer'
+                }
+                ${isHighlighted ? 'ring-4 ring-blue-500' : ''}
+              `}
+              onClick={() => handleMonthClick(index)}
+            >
+              <span className='text-xl font-bold text-gray-100'>
+                {monthName}
+              </span>
+              <span className='text-sm mt-1'>
+                {hasMeaningfulMeasurements ? '✅ Logged' : '➕ Add'}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      {showMeasurementModal && (
+        <MeasurementModal
+          monthData={currentMonthData}
+          onClose={() => setShowMeasurementModal(false)}
+          onSave={(data) => {
+            const dateKey = formatDate(new Date(data.date))
+            setDoc(
+              doc(
+                db,
+                `artifacts/${appId}/users/${userId}/measurements`,
+                dateKey
+              ),
+              data,
+              { merge: true }
+            )
+              .then(() => {
+                setMessage('Measurement saved successfully!')
+                setMessageType('success')
+                setShowMeasurementModal(false)
+              })
+              .catch((e) => {
+                console.error('Error saving measurement:', e)
+                setMessage('Failed to save measurement.')
+                setMessageType('error')
+              })
+          }}
+          onDelete={(dateKey) => {
+            deleteDoc(
+              doc(
+                db,
+                `artifacts/${appId}/users/${userId}/measurements`,
+                dateKey
+              )
+            )
+              .then(() => {
+                setMessage('Measurement deleted successfully!')
+                setMessageType('success')
+                setShowMeasurementModal(false)
+              })
+              .catch((e) => {
+                console.error('Error deleting measurement:', e)
+                setMessage('Failed to delete measurement.')
+                setMessageType('error')
+              })
+          }}
+          onClearData={(dateKey) => {
+            // Overwrite with empty object, ensuring imageUrls is an empty array
+            setDoc(
+              doc(
+                db,
+                `artifacts/${appId}/users/${userId}/measurements`,
+                dateKey
+              ),
+              {
+                date: dateKey, // Keep the date key
+                weight: '',
+                bodyFat: '',
+                chest: '',
+                waist: '',
+                neck: '',
+                forearms: '',
+                arms: '',
+                hips: '',
+                legs: '',
+                calves: '',
+                notes: '',
+                imageUrls: [], // Explicitly set to empty array
+              },
+              { merge: false }
+            ) // Use merge: false to completely overwrite
+              .then(() => {
+                setMessage('Measurement data cleared successfully!')
+                setMessageType('success')
+                setShowMeasurementModal(false)
+              })
+              .catch((e) => {
+                console.error('Error clearing measurement data:', e)
+                setMessage('Failed to clear measurement data.')
+                setMessageType('error')
+              })
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// Measurement Modal Component
+const MeasurementModal = ({
+  monthData,
+  onClose,
+  onSave,
+  onDelete,
+  onClearData,
+}) => {
+  const [formData, setFormData] = useState(monthData)
+  const [showImagePreview, setShowImagePreview] = useState(false)
+  const [previewImageUrl, setPreviewImageUrl] = useState('')
+  const [message, setMessage] = useState('')
+  const [messageType, setMessageType] = useState('')
+  const [showConfirmClearModal, setShowConfirmClearModal] = useState(false)
+
+  // Initialize imageUrls with at least one empty entry if none exist
+  useEffect(() => {
+    // Ensure imageUrls is always an array, even if it's undefined or null from Firestore
+    if (!formData.imageUrls) {
+      setFormData((prev) => ({ ...prev, imageUrls: [{ url: '', label: '' }] }))
+    } else if (formData.imageUrls.length === 0) {
+      // If it's an empty array, still ensure at least one input field is shown
+      setFormData((prev) => ({ ...prev, imageUrls: [{ url: '', label: '' }] }))
+    }
+  }, [formData.imageUrls]) // Depend on formData.imageUrls to react to changes
+
+  const handleFieldChange = (e) => {
+    const { name, value } = e.target
+    setFormData((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleImageURLChange = (index, field, value) => {
+    const updatedUrls = [...formData.imageUrls]
+    updatedUrls[index] = { ...updatedUrls[index], [field]: value }
+    setFormData((prev) => ({ ...prev, imageUrls: updatedUrls }))
+  }
+
+  const handleAddImageField = () => {
+    if (formData.imageUrls.length < 10) {
+      setFormData((prev) => ({
+        ...prev,
+        imageUrls: [...prev.imageUrls, { url: '', label: '' }],
+      }))
+    } else {
+      setMessage('Maximum of 10 images allowed.')
+      setMessageType('error')
+    }
+  }
+
+  const handleRemoveImageField = (index) => {
+    const updatedUrls = formData.imageUrls.filter((_, i) => i !== index)
+    // Ensure there's always at least one empty image field if all are removed
+    setFormData((prev) => ({
+      ...prev,
+      imageUrls:
+        updatedUrls.length > 0 ? updatedUrls : [{ url: '', label: '' }],
+    }))
+  }
+
+  const handleImageClick = (url) => {
+    setPreviewImageUrl(url)
+    setShowImagePreview(true)
+  }
+
+  const measurementFields = [
+    { label: 'Weight (kg)', key: 'weight', type: 'number', optional: true },
+    { label: 'Body Fat (%)', key: 'bodyFat', type: 'number', optional: true },
+    { label: 'Chest (in)', key: 'chest', type: 'number' },
+    { label: 'Waist (in)', key: 'waist', type: 'number' },
+    { label: 'Neck (in)', key: 'neck', type: 'number' },
+    { label: 'Forearms (in)', key: 'forearms', type: 'number' },
+    { label: 'Arms (in)', key: 'arms', type: 'number' },
+    { label: 'Hips (in)', key: 'hips', type: 'number' },
+    { label: 'Legs (in)', key: 'legs', type: 'number' },
+    { label: 'Calves (in)', key: 'calves', type: 'number' },
+  ]
+
+  return (
+    <Modal onClose={onClose}>
+      <h3 className='text-xl font-bold text-blue-400 mb-4'>
+        Measurements for{' '}
+        {new Date(formData.date).toLocaleString('default', {
+          month: 'long',
+          year: 'numeric',
+        })}
+      </h3>
+      {message && (
+        <div
+          className={`p-3 mb-4 rounded-md text-center ${
+            messageType === 'success'
+              ? 'bg-green-800 text-green-200'
+              : 'bg-red-800 text-red-200'
+          }`}
+        >
+          {message}
+        </div>
+      )}
+      {/* Scrollable Content Area */}
+      <div className='overflow-y-auto max-h-[70vh] pr-2 -mr-2 '>
+        {' '}
+        {/* Added pr-2 -mr-2 for scrollbar */}
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-4 mb-4'>
+          {measurementFields.map((field) => (
+            <label key={field.key} className='block'>
+              <span className='text-gray-300'>
+                {field.label} {field.optional && '(Optional)'}:
+              </span>
+              <input
+                type={field.type}
+                step='0.1'
+                name={field.key}
+                placeholder={field.label}
+                value={formData[field.key] || ''}
+                onChange={handleFieldChange}
+                className='p-3 mt-1 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
+              />
+            </label>
+          ))}
+          <label className='block col-span-full'>
+            <span className='text-gray-300'>Notes (optional):</span>
+            <textarea
+              name='notes'
+              placeholder="Any additional notes for this month's measurements..."
+              value={formData.notes || ''}
+              onChange={handleFieldChange}
+              rows='3'
+              className='p-3 mt-1 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
+            ></textarea>
+          </label>
+        </div>
+        <h4 className='text-lg font-semibold text-gray-200 mb-2'>
+          Physique Pictures
+        </h4>
+        <div className='space-y-3 mb-4'>
+          {/* Ensure formData.imageUrls is an array before mapping */}
+          {(formData.imageUrls || []).map((img, index) => (
+            <div
+              key={index}
+              className='flex flex-col sm:flex-row gap-2 items-center'
+            >
+              <input
+                type='url'
+                placeholder={`Image ${index + 1} URL`}
+                value={img.url}
+                onChange={(e) =>
+                  handleImageURLChange(index, 'url', e.target.value)
+                }
+                className='flex-grow p-3 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
+              />
+              <input
+                type='text'
+                placeholder='Label (e.g., Front Pose)'
+                value={img.label}
+                onChange={(e) =>
+                  handleImageURLChange(index, 'label', e.target.value)
+                }
+                className='flex-grow p-3 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
+              />
+              {(formData.imageUrls || []).length > 1 && ( // Allow removing if more than one field
+                <button
+                  onClick={() => handleRemoveImageField(index)}
+                  className='p-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-sm'
+                >
+                  🗑️
+                </button>
+              )}
+            </div>
+          ))}
+          {(formData.imageUrls || []).length < 10 && (
+            <button
+              onClick={handleAddImageField}
+              className='px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-sm w-full'
+            >
+              ➕ Add Another Image
+            </button>
+          )}
+        </div>
+        {/* Display images for viewing */}
+        {formData.imageUrls &&
+          formData.imageUrls.filter((img) => img.url).length > 0 && (
+            <div className='mt-4'>
+              <h4 className='font-semibold text-gray-200 mb-2'>
+                Current Images:
+              </h4>
+              <div className='grid grid-cols-2 gap-4'>
+                {formData.imageUrls
+                  .filter((img) => img.url)
+                  .map((img, idx) => (
+                    <div
+                      key={idx}
+                      className='bg-gray-900 p-2 rounded-lg shadow-inner cursor-pointer'
+                      onClick={() => handleImageClick(img.url)}
+                    >
+                      {img.label && (
+                        <p className='text-xs text-gray-400 mb-1'>
+                          {img.label}
+                        </p>
+                      )}
+                      <img
+                        src={img.url}
+                        alt={img.label || `Physique Image ${idx + 1}`}
+                        className='w-full h-32 object-cover rounded-md mb-1'
+                        onError={(e) => {
+                          e.target.onerror = null
+                          e.target.src =
+                            'https://placehold.co/300x200/4a5568/a0aec0?text=Image+Load+Error'
+                        }}
+                      />
+                      <p className='text-xs text-gray-500 truncate'>
+                        {img.url}
+                      </p>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+        <div className='flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3 mt-6 pt-4 border-t border-gray-700'>
+          {/* Only show clear if there's any data for this month (even if it's just an empty object from a previous save) */}
+          {Object.keys(monthData).length > 1 && ( // Check if monthData has more than just 'date'
+            <button
+              onClick={() => setShowConfirmClearModal(true)}
+              className='px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors shadow-sm'
+            >
+              🧹 Clear Data
+            </button>
+          )}
+          <button
+            onClick={() => onSave(formData)}
+            className='px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-sm'
+          >
+            Save Measurement
+          </button>
+        </div>
+      </div>{' '}
+      {/* End of scrollable content */}
+      {showImagePreview && (
+        <ImagePreviewModal
+          imageUrl={previewImageUrl}
+          onClose={() => setShowImagePreview(false)}
+        />
+      )}
+      {showConfirmClearModal && (
+        <Modal onClose={() => setShowConfirmClearModal(false)}>
+          <h3 className='text-xl font-bold text-blue-400 mb-4'>
+            Confirm Clear Data
+          </h3>
+          <p className='text-gray-200 mb-6'>
+            Are you sure you want to clear all measurement data for this month?
+            This will make it appear as "not logged" again, but the month entry
+            itself will remain.
+          </p>
+          <div className='flex justify-end space-x-3'>
+            <button
+              onClick={() => setShowConfirmClearModal(false)}
+              className='px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors'
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                onClearData(formData.date)
+                setShowConfirmClearModal(false)
+              }}
+              className='px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors'
+            >
+              Clear Data
+            </button>
+          </div>
+        </Modal>
+      )}
+    </Modal>
+  )
+}
+
+// Image Preview Modal
+const ImagePreviewModal = ({ imageUrl, onClose }) => {
+  return (
+    <div className='fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center p-4 z-50'>
+      <div className='bg-gray-800 p-4 rounded-xl shadow-lg relative max-w-4xl w-full h-auto max-h-[90vh] flex flex-col'>
+        <button
+          onClick={onClose}
+          className='absolute top-3 right-3 text-gray-400 hover:text-gray-100 text-3xl font-bold z-10'
+        >
+          &times;
+        </button>
+        <div className='flex-grow flex items-center justify-center overflow-auto'>
+          <img
+            src={imageUrl}
+            alt='Full size preview'
+            className='max-w-full max-h-full object-contain rounded-lg'
+            onError={(e) => {
+              e.target.onerror = null
+              e.target.src =
+                'https://placehold.co/800x600/4a5568/a0aec0?text=Image+Load+Error'
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Statistics Page Component
+const StatisticsPage = ({ setCurrentPage }) => {
+  const { db, userId, isAuthReady } = useContext(FirebaseContext)
+  const [workoutStats, setWorkoutStats] = useState({}) // { year: { workoutDays, restDays } }
+  const [measurements, setMeasurements] = useState([]) // Array of all measurements for display
+  const [message, setMessage] = useState('')
+  const [messageType, setMessageType] = useState('') // 'success' or 'error'
+
+  // Use a fixed app ID for Firestore path as __app_id is not available locally
+  const appId = 'workout-tracker-app-local' // Or any unique string for your local app
+
+  // Helper to check if measurement data is effectively empty
+  const isEmptyMeasurementData = (data) => {
+    if (!data) return true // No data at all means empty
+
+    // Check numerical fields
+    const numericFields = [
+      'weight',
+      'bodyFat',
+      'chest',
+      'waist',
+      'neck',
+      'forearms',
+      'arms',
+      'hips',
+      'legs',
+      'calves',
+    ]
+    const hasNumericData = numericFields.some((field) => {
+      const value = data[field]
+      // Consider 0 as data if it's explicitly set, but empty string/null/undefined as empty
+      return (
+        value !== '' &&
+        value !== null &&
+        value !== undefined &&
+        (typeof value === 'number' ? value !== 0 : true)
+      )
+    })
+
+    // Check notes
+    const hasNotes = data.notes && data.notes.trim() !== ''
+
+    // Check image URLs
+    const hasImageUrls =
+      data.imageUrls &&
+      data.imageUrls.some((img) => img.url && img.url.trim() !== '')
+
+    return !(hasNumericData || hasNotes || hasImageUrls)
+  }
+
+  useEffect(() => {
+    if (!db || !userId || !isAuthReady) return
+
+    // Fetch workout data for statistics
+    const workoutsCollectionRef = collection(
+      db,
+      `artifacts/${appId}/users/${userId}/workouts`
+    )
+    const unsubscribeWorkouts = onSnapshot(
+      workoutsCollectionRef,
+      (snapshot) => {
+        const yearlyStats = {}
+        snapshot.forEach((doc) => {
+          const data = doc.data()
+          const docDate = new Date(doc.id) // doc.id is 'YYYY-MM-DD'
+          const year = docDate.getFullYear()
+          const hasWorkoutLogged = (data.exercises?.length || 0) > 0
+          const dayType = data.type || 'rest' // Default to rest if not explicitly set
+
+          if (!yearlyStats[year]) {
+            yearlyStats[year] = { workoutDays: 0, restDays: 0 }
+          }
+
+          if (dayType === 'workout' && hasWorkoutLogged) {
+            yearlyStats[year].workoutDays++
+          } else {
+            yearlyStats[year].restDays++
+          }
+        })
+        setWorkoutStats(yearlyStats)
+      },
+      (error) => {
+        console.error('Error fetching workout stats:', error)
+        setMessage('Error loading workout statistics.')
+        setMessageType('error')
+      }
+    )
+
+    // Fetch all measurements for display
+    const measurementsCollectionRef = collection(
+      db,
+      `artifacts/${appId}/users/${userId}/measurements`
+    )
+    const unsubscribeMeasurements = onSnapshot(
+      measurementsCollectionRef,
+      (snapshot) => {
+        const fetchedMeasurements = []
+        snapshot.forEach((doc) => {
+          const data = doc.data()
+          // Only include months with meaningful data
+          if (!isEmptyMeasurementData(data)) {
+            fetchedMeasurements.push({ id: doc.id, ...data })
+          }
+        })
+        fetchedMeasurements.sort((a, b) => new Date(b.date) - new Date(a.date)) // Sort by date descending
+        setMeasurements(fetchedMeasurements)
+      },
+      (error) => {
+        console.error('Error fetching measurements:', error)
+        setMessage('Error loading measurements history.')
+        setMessageType('error')
+      }
+    )
+
+    return () => {
+      unsubscribeWorkouts()
+      unsubscribeMeasurements()
+    }
+  }, [db, userId, isAuthReady, appId])
+
+  // Sort years for display
+  const sortedYears = Object.keys(workoutStats).sort(
+    (a, b) => parseInt(b) - parseInt(a)
+  )
+
+  return (
+    <div className='bg-gray-800 p-6 rounded-xl shadow-lg text-gray-100'>
+      <h2 className='text-2xl font-bold text-blue-400 mb-6'>
+        📊 Statistics & Progress
+      </h2>
+
+      {message && (
+        <div
+          className={`p-3 mb-4 rounded-md text-center ${
+            messageType === 'success'
+              ? 'bg-green-800 text-green-200'
+              : 'bg-red-800 text-red-200'
+          }`}
+        >
+          {message}
+        </div>
+      )}
+
+      <div className='mb-8 bg-gray-700 p-4 rounded-lg shadow-inner'>
+        <h3 className='text-xl font-semibold text-gray-200 mb-3'>
+          Yearly Workout Summary
+        </h3>
+        {sortedYears.length === 0 ? (
+          <p className='text-gray-400'>No workout data available yet.</p>
+        ) : (
+          <div className='space-y-3'>
+            {sortedYears.map((year) => (
+              <div key={year} className='bg-gray-800 p-3 rounded-md'>
+                <p className='text-lg font-bold text-blue-300'>Year: {year}</p>
+                <p className='text-gray-300'>
+                  Workout Days:{' '}
+                  <span className='font-bold text-green-400'>
+                    {workoutStats[year].workoutDays}
+                  </span>
+                </p>
+                <p className='text-gray-300'>
+                  Rest Days:{' '}
+                  <span className='font-bold text-yellow-400'>
+                    {workoutStats[year].restDays}
+                  </span>
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className='mb-6'>
+        <h3 className='text-xl font-semibold text-gray-200 mb-3'>
+          Measurement History
+        </h3>
+        {measurements.length === 0 ? (
+          <p className='text-gray-400'>No measurements recorded yet.</p>
+        ) : (
+          <div className='space-y-4'>
+            {measurements.map((m) => (
+              <div key={m.id} className='bg-gray-700 p-4 rounded-lg shadow-md'>
+                <div className='flex justify-between items-center mb-2'>
+                  <p className='font-semibold text-blue-300 text-lg'>
+                    {m.date}
+                  </p>
+                </div>
+                <div className='grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray-300 mb-3'>
+                  {m.weight !== null && <p>Weight: {m.weight} kg</p>}
+                  {m.bodyFat !== null && <p>Body Fat: {m.bodyFat} %</p>}
+                  <p>Chest: {m.chest} in</p>
+                  <p>Waist: {m.waist} in</p>
+                  <p>Neck: {m.neck} in</p>
+                  <p>Forearms: {m.forearms} in</p>
+                  <p>Arms: {m.arms} in</p>
+                  <p>Hips: {m.hips} in</p>
+                  <p>Legs: {m.legs} in</p>
+                  <p>Calves: {m.calves} in</p>
+                </div>
+                {m.notes && (
+                  <p className='text-sm text-gray-400 italic mb-3'>
+                    Notes: {m.notes}
+                  </p>
+                )}
+
+                {m.imageUrls && m.imageUrls.length > 0 && (
+                  <div className='mt-4'>
+                    <h4 className='font-semibold text-gray-200 mb-2'>
+                      Physique Images:
+                    </h4>
+                    <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4'>
+                      {m.imageUrls.map(
+                        (img, idx) =>
+                          img.url && (
+                            <div
+                              key={idx}
+                              className='bg-gray-900 p-2 rounded-lg shadow-inner cursor-pointer'
+                              onClick={() => {
+                                /* This click handler is for display only, actual preview comes from MeasurementModal */
+                              }}
+                            >
+                              {img.label && (
+                                <p className='text-xs text-gray-400 mb-1'>
+                                  {img.label}
+                                </p>
+                              )}
+                              <img
+                                src={img.url}
+                                alt={img.label || `Physique Image ${idx + 1}`}
+                                className='w-full h-48 object-cover rounded-md mb-2'
+                                onError={(e) => {
+                                  e.target.onerror = null
+                                  e.target.src =
+                                    'https://placehold.co/300x200/4a5568/a0aec0?text=Image+Load+Error'
+                                }}
+                              />
+                              <p className='text-xs text-gray-500 truncate'>
+                                {img.url}
+                              </p>
+                            </div>
+                          )
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className='mt-8 text-center'>
+        <button
+          onClick={() => setCurrentPage('calendar')}
+          className='px-6 py-3 bg-gray-600 text-gray-100 rounded-lg hover:bg-gray-700 transition-colors shadow-md'
+        >
+          ⬅️ Back to Calendar
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Settings Page Component
+const SettingsPage = ({ setCurrentPage }) => {
+  const { db, auth, userId, isAuthReady } = useContext(FirebaseContext)
+  const [calendarSettings, setCalendarSettings] = useState({
+    workoutDaysOfWeek: [1, 2, 3, 4, 5], // Monday=1, Sunday=0
+    restDaysOfWeek: [0, 6], // Sunday=0, Saturday=6
+  })
+  const [message, setMessage] = useState('')
+  const [messageType, setMessageType] = useState('') // 'success' or 'error'
+  const [showConfirmSignOutModal, setShowConfirmSignOutModal] = useState(false)
+  const [showConfirmDeleteAccountModal, setShowConfirmDeleteAccountModal] =
+    useState(false)
+
+  // Use a fixed app ID for Firestore path as __app_id is not available locally
+  const appId = 'workout-tracker-app-local' // Or any unique string for your local app
+
+  useEffect(() => {
+    if (!db || !userId || !isAuthReady) return
+
+    const userSettingsDocRef = doc(
+      db,
+      `artifacts/${appId}/users/${userId}/calendarSettings`,
+      'settings'
+    )
+    const unsubscribeSettings = onSnapshot(
+      userSettingsDocRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setCalendarSettings(docSnap.data())
+        } else {
+          // Set default settings if none exist
+          setDoc(userSettingsDocRef, calendarSettings, { merge: true }).catch(
+            (e) => console.error('Error setting default calendar settings:', e)
+          )
+        }
+      },
+      (error) => {
+        console.error('Error fetching calendar settings:', error)
+        setMessage('Error loading calendar settings.')
+        setMessageType('error')
+      }
+    )
+
+    return () => unsubscribeSettings()
+  }, [db, userId, isAuthReady, appId])
+
+  const handleSaveSettings = async () => {
+    if (!db || !userId) return
+    const userSettingsDocRef = doc(
+      db,
+      `artifacts/${appId}/users/${userId}/calendarSettings`,
+      'settings'
+    )
+    try {
+      await setDoc(userSettingsDocRef, calendarSettings, { merge: true })
+      setMessage('Calendar settings saved successfully!')
+      setMessageType('success')
+    } catch (e) {
+      console.error('Error saving calendar settings:', e)
+      setMessage('Failed to save calendar settings.')
+      setMessageType('error')
+    }
+  }
+
+  const handleSignOut = async () => {
+    if (auth) {
+      try {
+        await signOut(auth)
+        console.log('User signed out.')
+        setMessage('Signed out successfully!')
+        setMessageType('success')
+        setShowConfirmSignOutModal(false)
+        // The App component will handle resetting state due to onAuthStateChanged
+      } catch (error) {
+        console.error('Error signing out:', error)
+        setMessage('Error signing out.')
+        setMessageType('error')
+      }
+    }
+  }
+
+  const handleDeleteAllAccountData = async () => {
+    if (!db || !userId || !auth) {
+      setMessage('Error: Firebase not initialized or user not logged in.')
+      setMessageType('error')
+      return
+    }
+
+    setMessage('Deleting account data...')
+    setMessageType('info')
+
+    try {
+      const batch = writeBatch(db)
+
+      // Define paths to all user-specific collections
+      const collectionsToDelete = [
+        'workouts',
+        'measurements',
+        'calendarSettings',
+        'userProfile',
+      ]
+
+      for (const collectionName of collectionsToDelete) {
+        const collectionRef = collection(
+          db,
+          `artifacts/${appId}/users/${userId}/${collectionName}`
+        )
+        const q = query(collectionRef) // Query all documents in the subcollection
+        const snapshot = await getDocs(q)
+
+        snapshot.forEach((docSnap) => {
+          batch.delete(docSnap.ref)
+        })
+      }
+
+      // Commit the batch deletion
+      await batch.commit()
+
+      // Delete the user's authentication record
+      // Note: Firebase security rules should allow this if the user is authenticated
+      // If you implement re-authentication, it should happen before this step.
+      if (auth.currentUser && auth.currentUser.uid === userId) {
+        await auth.currentUser.delete()
+      } else {
+        console.warn(
+          'User auth record not found or mismatch, skipping auth.currentUser.delete()'
+        )
+      }
+
+      setMessage('All account data deleted successfully! Signing you out...')
+      setMessageType('success')
+      setShowConfirmDeleteAccountModal(false)
+      await signOut(auth) // Sign out after data deletion
+    } catch (error) {
+      console.error('Error deleting all account data:', error)
+      setMessage(`Failed to delete all account data: ${error.message}`)
+      setMessageType('error')
+    }
+  }
+
+  const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+  return (
+    <div className='bg-gray-800 p-6 rounded-xl shadow-lg text-gray-100'>
+      <h2 className='text-2xl font-bold text-blue-400 mb-6'>⚙️ Settings</h2>
+
+      {message && (
+        <div
+          className={`p-3 mb-4 rounded-md text-center ${
+            messageType === 'success'
+              ? 'bg-green-800 text-green-200'
+              : messageType === 'error'
+              ? 'bg-red-800 text-red-200'
+              : 'bg-blue-800 text-blue-200'
+          }`}
+        >
+          {message}
+        </div>
+      )}
+
+      <div className='mb-8 bg-gray-700 p-4 rounded-lg shadow-inner'>
+        <h3 className='text-xl font-semibold text-gray-200 mb-3'>
+          Calendar Preferences
+        </h3>
+        <div className='mb-4'>
+          <label className='block text-gray-200 font-semibold mb-2'>
+            Workout Days:
+          </label>
+          <div className='flex flex-wrap gap-2'>
+            {daysOfWeek.map((day, index) => (
+              <label
+                key={`workout-${index}`}
+                className='flex items-center space-x-2 bg-gray-600 p-2 rounded-md cursor-pointer hover:bg-gray-500 transition-colors'
+              >
+                <input
+                  type='checkbox'
+                  checked={calendarSettings.workoutDaysOfWeek.includes(index)}
+                  onChange={(e) => {
+                    const newDays = e.target.checked
+                      ? [...calendarSettings.workoutDaysOfWeek, index]
+                      : calendarSettings.workoutDaysOfWeek.filter(
+                          (d) => d !== index
+                        )
+                    setCalendarSettings((prev) => ({
+                      ...prev,
+                      workoutDaysOfWeek: newDays,
+                    }))
+                  }}
+                  className='form-checkbox h-5 w-5 text-blue-500 rounded-md bg-gray-700 border-gray-500 checked:bg-blue-500'
+                />
+                <span>{day}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className='mb-6'>
+          <label className='block text-gray-200 font-semibold mb-2'>
+            Rest Days:
+          </label>
+          <div className='flex flex-wrap gap-2'>
+            {daysOfWeek.map((day, index) => (
+              <label
+                key={`rest-${index}`}
+                className='flex items-center space-x-2 bg-gray-600 p-2 rounded-md cursor-pointer hover:bg-gray-500 transition-colors'
+              >
+                <input
+                  type='checkbox'
+                  checked={calendarSettings.restDaysOfWeek.includes(index)}
+                  onChange={(e) => {
+                    const newDays = e.target.checked
+                      ? [...calendarSettings.restDaysOfWeek, index]
+                      : calendarSettings.restDaysOfWeek.filter(
+                          (d) => d !== index
+                        )
+                    setCalendarSettings((prev) => ({
+                      ...prev,
+                      restDaysOfWeek: newDays,
+                    }))
+                  }}
+                  className='form-checkbox h-5 w-5 text-red-500 rounded-md bg-gray-700 border-gray-500 checked:bg-red-500'
+                />
+                <span>{day}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <button
+          onClick={handleSaveSettings}
+          className='w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-sm'
+        >
+          Save Calendar Settings
+        </button>
+      </div>
+
+      <div className='bg-gray-700 p-4 rounded-lg shadow-inner space-y-4'>
+        <h3 className='text-xl font-semibold text-gray-200 mb-3'>
+          Account Actions
+        </h3>
+        <button
+          onClick={() => setShowConfirmSignOutModal(true)}
+          className='w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-sm'
+        >
+          Sign Out
+        </button>
+        <button
+          onClick={() => setShowConfirmDeleteAccountModal(true)}
+          className='w-full px-4 py-2 bg-red-800 text-white rounded-md hover:bg-red-900 transition-colors shadow-sm'
+        >
+          ⚠️ Clear All Account Data
+        </button>
+      </div>
+
+      <div className='mt-8 text-center'>
+        <button
+          onClick={() => setCurrentPage('calendar')}
+          className='px-6 py-3 bg-gray-600 text-gray-100 rounded-lg hover:bg-gray-700 transition-colors shadow-md'
+        >
+          ⬅️ Back to Calendar
+        </button>
+      </div>
+
+      {showConfirmSignOutModal && (
+        <Modal onClose={() => setShowConfirmSignOutModal(false)}>
+          <h3 className='text-xl font-bold text-blue-400 mb-4'>
+            Confirm Sign Out
+          </h3>
+          <p className='text-gray-200 mb-6'>
+            Are you sure you want to sign out?
+          </p>
+          <div className='flex justify-end space-x-3'>
+            <button
+              onClick={() => setShowConfirmSignOutModal(false)}
+              className='px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors'
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSignOut}
+              className='px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors'
+            >
+              Sign Out
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showConfirmDeleteAccountModal && (
+        <Modal onClose={() => setShowConfirmDeleteAccountModal(false)}>
+          <h3 className='text-xl font-bold text-red-400 mb-4'>
+            Confirm Account Deletion
+          </h3>
+          <p className='text-gray-200 mb-6'>
+            <span className='font-bold text-red-300'>WARNING:</span> This action
+            will permanently delete ALL your workout logs, measurements, and
+            settings. This cannot be undone.
+            <br />
+            <br />
+            Are you absolutely sure you want to proceed?
+          </p>
+          <div className='flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3'>
+            <button
+              onClick={() => setShowConfirmDeleteAccountModal(false)}
+              className='px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors'
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDeleteAllAccountData}
+              className='px-4 py-2 bg-red-800 text-white rounded-md hover:bg-red-900 transition-colors'
+            >
+              Delete All My Data
+            </button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+// Generic Modal Component
+const Modal = ({ children, onClose }) => {
+  return (
+    <div className='fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center px-4 py-10 z-50'>
+      <div className='bg-gray-800 p-6 rounded-xl shadow-lg max-w-lg w-full relative text-gray-100'>
+        <button
+          onClick={onClose}
+          className='absolute top-3 right-3 text-gray-400 hover:text-gray-100 text-2xl font-bold'
+        >
+          &times;
+        </button>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+export default App
