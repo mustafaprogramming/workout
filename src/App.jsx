@@ -1,4 +1,10 @@
-import { useState, useEffect, createContext, useContext } from 'react'
+import React, {
+  useState,
+  useEffect,
+  createContext,
+  useContext,
+  useRef,
+} from 'react'
 import { initializeApp } from 'firebase/app'
 import {
   getAuth,
@@ -15,6 +21,7 @@ import {
   collection,
   query,
   onSnapshot,
+  updateDoc,
   deleteDoc,
   serverTimestamp,
   getDocs,
@@ -32,9 +39,6 @@ const formatDate = (date) => {
   return `${year}-${month}-${day}`
 }
 
-// Firebase Configuration from Environment Variables
-// IMPORTANT: For Vite.js applications, environment variables must start with VITE_
-// Ensure your .env file variables are prefixed like VITE_FIREBASE_API_KEY
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -42,6 +46,7 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID, // Optional
 }
 
 // Main App Component
@@ -170,9 +175,9 @@ const App = () => {
 
   return (
     <FirebaseContext.Provider value={{ db, auth, userId, isAuthReady }}>
-      <div className='min-h-screen bg-gray-900 text-gray-100 font-inter'>
-        <header className='bg-gray-800 shadow-lg p-4 flex justify-between items-center rounded-b-xl'>
-          <h1 className='text-3xl font-extrabold text-blue-400 tracking-tight'>
+      <div className='min-h-screen bg-gray-900 text-gray-100 font-inter   '>
+        <header className='bg-gray-800 p-4 flex justify-start items-center rounded-b-3xl sticky top-0 max-w-[90vw] mx-auto sm:shadow-[0_10px_0px_0px_#111827] shadow-[0_5px_0px_0px_#111827] '>
+          <h1 className='text-3xl font-extrabold text-blue-400 justify-around items-center flex gap-3'>
             <svg
               width='32'
               height='32'
@@ -180,66 +185,50 @@ const App = () => {
               fill='none'
               xmlns='http://www.w3.org/2000/svg'
             >
-              <circle
-                cx='16'
-                cy='16'
-                r='14'
-                stroke='#60A5FA'
-                stroke-width='2'
-              />
-
+              <circle cx='16' cy='16' r='14' stroke='#60A5FA' strokeWidth='2' />
               <circle cx='16' cy='16' r='6' fill='#60A5FA' />
-
               <path
                 d='M11 21 L16 16 L21 21'
                 stroke='#60A5FA'
-                stroke-width='2'
-                stroke-linecap='round'
-                stroke-linejoin='round'
+                strokeWidth='2'
+                strokeLinecap='round'
+                strokeLinejoin='round'
               />
-            </svg> CoreTrack
+            </svg>
+            CoreTrack
           </h1>
-          <div className='flex items-center space-x-4'>
-            {userId && (
-              <span className='text-sm text-gray-400'>
-                User ID:{' '}
-                <span className='font-mono text-blue-300'>{userId}</span>
-              </span>
-            )}
-            {/* Sign Out button moved to SettingsPage */}
-          </div>
         </header>
 
         {userId && ( // Only show navigation if logged in
-          <nav className='bg-gray-700 sticky top-5 text-white p-3 shadow-lg rounded-xl mx-4 mt-4 flex justify-around items-center shadow-[0_10px_0px_0px_#111827] '>
+          <nav className='bg-gray-700 sticky top-[84px] text-white sm:p-3 p-1 rounded-xl mx-4 mt-4 grid grid-cols-4 sm:gap-2 gap-1 justify-around items-center sm:shadow-[0_10px_0px_0px_#111827] shadow-[0_5px_0px_0px_#111827] sm:text-base text-sm '>
             <NavItem
               onClick={() => setCurrentPage('calendar')}
               isActive={currentPage === 'calendar'}
             >
-              📅 Calendar
+              📅 <span className='sm:flex hidden'>Calendar</span>
             </NavItem>
             <NavItem
               onClick={() => setCurrentPage('measurements')}
               isActive={currentPage === 'measurements'}
             >
-              📏 Measurements
+              📏 <span className='sm:flex hidden'>Measurements</span>
             </NavItem>
             <NavItem
               onClick={() => setCurrentPage('statistics')}
               isActive={currentPage === 'statistics'}
             >
-              📊 Statistics
+              📊 <span className='sm:flex hidden'>Statistics</span>
             </NavItem>
             <NavItem
               onClick={() => setCurrentPage('settings')}
               isActive={currentPage === 'settings'}
             >
-              ⚙️ Settings
+              ⚙️ <span className='sm:flex hidden'>Settings</span>
             </NavItem>
           </nav>
         )}
 
-        <main className='p-4'>{renderPage()}</main>
+        <main className='p-2 sm:p-4'>{renderPage()}</main>
       </div>
     </FirebaseContext.Provider>
   )
@@ -248,7 +237,7 @@ const App = () => {
 const NavItem = ({ children, onClick, isActive }) => (
   <button
     onClick={onClick}
-    className={`px-5 py-2 rounded-lg transition-all duration-300 ${
+    className={`px-2.5 sm:px-5 py-1 sm:py-2 rounded-lg transition-all duration-300 flex flex-col items-center justify-center ${
       isActive
         ? 'bg-gray-900 text-blue-400 shadow-md font-semibold'
         : 'hover:bg-gray-600 text-gray-200 hover:text-white'
@@ -258,7 +247,7 @@ const NavItem = ({ children, onClick, isActive }) => (
   </button>
 )
 
-// Auth Page Component (NEW)
+// Auth Page Component
 const AuthPage = () => {
   const { auth, db } = useContext(FirebaseContext)
   const [email, setEmail] = useState('')
@@ -331,8 +320,8 @@ const AuthPage = () => {
   }
 
   return (
-    <div className='flex items-center justify-center min-h-[calc(100vh-10rem)] p-4'>
-      <div className='bg-gray-800 p-8 rounded-xl shadow-lg w-full max-w-md text-gray-100'>
+    <div className='flex items-center justify-center min-h-[calc(100vh-10rem)] p-2 sm:p-4'>
+      <div className='bg-gray-800 p-4 sm:p-8 rounded-xl shadow-lg w-full max-w-md text-gray-100'>
         <h2 className='text-2xl font-bold text-blue-400 mb-6 text-center'>
           {isRegistering ? 'Register' : 'Login'}
         </h2>
@@ -355,7 +344,7 @@ const AuthPage = () => {
             placeholder='Email'
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className='p-3 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
+            className='p-1.5 sm:p-3 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
             disabled={loading}
           />
           <div className='relative'>
@@ -364,7 +353,7 @@ const AuthPage = () => {
               placeholder='Password'
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className='p-3 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 pr-10'
+              className='p-1.5 sm:p-3 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 pr-10'
               disabled={loading}
             />
             <button
@@ -382,7 +371,7 @@ const AuthPage = () => {
                 placeholder='Confirm Password'
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className='p-3 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 pr-10'
+                className='p-1.5 sm:p-3 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 pr-10'
                 disabled={loading}
               />
               <button
@@ -398,7 +387,7 @@ const AuthPage = () => {
 
         <button
           onClick={handleAuthAction}
-          className='w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm font-semibold'
+          className='w-full px-4 py-2 sm:py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm font-semibold'
           disabled={loading}
         >
           {loading ? 'Processing...' : isRegistering ? 'Register' : 'Login'}
@@ -548,7 +537,14 @@ const CalendarPage = ({ setCurrentPage, setSelectedDate, userCreatedAt }) => {
     const hasWorkoutLogged = (storedData?.exercises?.length || 0) > 0
 
     setSelectedDate(date)
-    setSelectedDayData({ date, dateKey, effectiveType, hasWorkoutLogged })
+    // Pass the full workout details (exercises array) to the modal
+    setSelectedDayData({
+      date,
+      dateKey,
+      effectiveType,
+      hasWorkoutLogged,
+      exercises: storedData?.exercises || [],
+    })
     setShowDayActionsModal(true)
   }
 
@@ -609,7 +605,9 @@ const CalendarPage = ({ setCurrentPage, setSelectedDate, userCreatedAt }) => {
 
     // Fill leading empty days
     for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`empty-${i}`} className='p-2 text-center'></div>)
+      days.push(
+        <div key={`empty-${i}`} className='sm:p-2 p-1 text-center'></div>
+      )
     }
 
     // Fill actual days
@@ -664,7 +662,7 @@ const CalendarPage = ({ setCurrentPage, setSelectedDate, userCreatedAt }) => {
       days.push(
         <div
           key={day}
-          className={`relative p-3 border rounded-lg shadow-md flex flex-col items-center justify-center transition-all duration-200
+          className={`relative sm:p-3 p-1.5 border rounded-lg shadow-md flex flex-col items-center justify-center transition-all duration-200
             ${bgColor} ${borderColor} ${
             isFutureDate || isBeforeAccountCreation
               ? 'cursor-not-allowed opacity-60'
@@ -675,8 +673,8 @@ const CalendarPage = ({ setCurrentPage, setSelectedDate, userCreatedAt }) => {
           `}
           onClick={() => handleDayClick(day)}
         >
-          <span className={`text-lg font-bold ${textColor}`}>{day}</span>
-          <span className='text-sm mt-1'>{statusEmoji}</span>
+          <span className={`sm:text-lg font-bold ${textColor}`}>{day}</span>
+          <span className='text-sm sm:mt-1'>{statusEmoji}</span>
         </div>
       )
     }
@@ -686,8 +684,8 @@ const CalendarPage = ({ setCurrentPage, setSelectedDate, userCreatedAt }) => {
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
   return (
-    <div className='bg-gray-800 p-6 rounded-xl shadow-lg text-gray-100'>
-      <h2 className='text-2xl font-bold text-blue-400 mb-6'>
+    <div className='bg-gray-800 p-3 sm:p-6 rounded-xl shadow-lg text-gray-100'>
+      <h2 className='sm:text-2xl text-xl font-bold text-blue-400 mb-6'>
         📅 Workout Calendar
       </h2>
 
@@ -714,11 +712,11 @@ const CalendarPage = ({ setCurrentPage, setSelectedDate, userCreatedAt }) => {
               )
             )
           }
-          className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm'
+          className='px-2 sm:px-4 py-1 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm'
         >
-          Previous
+          Prev
         </button>
-        <h3 className='text-xl font-semibold text-gray-200'>
+        <h3 className='md:text-xl sm:text-lg font-semibold text-gray-200'>
           {currentMonth.toLocaleString('default', {
             month: 'long',
             year: 'numeric',
@@ -734,7 +732,7 @@ const CalendarPage = ({ setCurrentPage, setSelectedDate, userCreatedAt }) => {
               )
             )
           }
-          className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm'
+          className='px-2 sm:px-4 py-1 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm'
         >
           Next
         </button>
@@ -745,31 +743,35 @@ const CalendarPage = ({ setCurrentPage, setSelectedDate, userCreatedAt }) => {
           type='date'
           value={searchDate}
           onChange={(e) => setSearchDate(e.target.value)}
-          className='flex-grow p-3 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
+          className='flex-grow flex-1 p-1.5 sm:p-3 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
         />
         <button
           onClick={handleSearchDate}
-          className='px-4 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-sm'
+          className='sm:px-4 px-2 py-1.5 sm:py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-sm'
         >
           🔍 Go to Date
         </button>
       </div>
 
-      <div className='grid grid-cols-7 gap-3 mb-4'>
+      <div className='grid grid-cols-7 sm:gap-3 gap-1 sm:mb-4 mb-2'>
         {daysOfWeek.map((day) => (
-          <div key={day} className='font-semibold text-center text-gray-400'>
+          <div
+            key={day}
+            className='sm:text-base text-sm font-semibold text-center text-gray-400'
+          >
             {day}
           </div>
         ))}
       </div>
 
-      <div className='grid grid-cols-7 gap-3'>{renderDays()}</div>
+      <div className='grid grid-cols-7 sm:gap-3 gap-1'>{renderDays()}</div>
 
       {showDayActionsModal && selectedDayData && (
         <DayActionsModal
           date={selectedDayData.date}
           effectiveType={selectedDayData.effectiveType}
           hasWorkoutLogged={selectedDayData.hasWorkoutLogged}
+          workoutDetails={selectedDayData.exercises} // Pass workout details here
           onClose={() => setShowDayActionsModal(false)}
           onLogWorkout={() => {
             setSelectedDate(selectedDayData.date)
@@ -790,6 +792,7 @@ const DayActionsModal = ({
   date,
   effectiveType,
   hasWorkoutLogged,
+  workoutDetails, // New prop
   onClose,
   onLogWorkout,
   onConvertDayType,
@@ -815,7 +818,7 @@ const DayActionsModal = ({
 
   return (
     <Modal onClose={onClose}>
-      <h3 className='text-xl font-bold text-blue-400 mb-4'>
+      <h3 className='text-xl font-bold text-blue-400 mb-4 mr-[34px]'>
         Actions for {date.toDateString()}
       </h3>
       <div className='mb-6'>
@@ -842,11 +845,65 @@ const DayActionsModal = ({
           </span>
         </p>
       </div>
+
+      {/* Display Workout Details if available and logged */}
+      {effectiveType === 'workout' &&
+        hasWorkoutLogged &&
+        workoutDetails &&
+        workoutDetails.length > 0 && (
+          <div className='overflow-hidden rounded-lg mb-6'>
+            <div className=' p-2 bg-gray-700 rounded-lg shadow-inner max-h-[45vh] overflow-y-auto '>
+              <h4 className='text-lg font-semibold text-gray-200 mb-3'>
+                Workout Details:
+              </h4>
+              {workoutDetails.map((exercise, exIndex) => {
+                return (
+                  <div
+                    key={exIndex}
+                    className='mb-3 border border-gray-600 p-2 rounded-md '
+                  >
+                    <p className='font-semibold py-1 px-3 bg-gray-800 rounded-md text-blue-300 text-base sm:text-lg capitalize'>
+                      {exercise.name}
+                    </p>
+                    {exercise.sets.map((set, index) => (
+                      <p
+                        key={index}
+                        className='text-sm text-gray-300 flex flex-col gap-2 mt-4'
+                      >
+                        <span className='py-1 px-2 bg-teal-600 rounded-md font-semibold w-fit sm:text-base text-sm'>
+                          Set {index + 1}:
+                        </span>
+                        <span className='flex gap-2 sm:gap-4 text-gray-900 text-xs sm:text-sm w-full'>
+                          {set.reps && (
+                            <span className='rounded-md bg-orange-400 p-1 w-full'>
+                              Reps : {set.reps}
+                            </span>
+                          )}
+                          {set.weight && (
+                            <span className='rounded-md bg-red-400 p-1 w-full'>
+                              Weight : {set.weight} kg{' '}
+                            </span>
+                          )}
+                          {set.restTime && (
+                            <span className='rounded-md bg-blue-400 p-1 w-full'>
+                              Rest: {set.restTime}
+                            </span>
+                          )}
+                        </span>
+                      </p>
+                    ))}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
       <div className='flex flex-col space-y-3'>
         {effectiveType === 'workout' && (
           <button
             onClick={onLogWorkout}
-            className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm w-full'
+            className='px-2 py-1 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm w-full'
           >
             📝 Log Workout
           </button>
@@ -860,7 +917,7 @@ const DayActionsModal = ({
                 'Are you sure you want to convert this to a REST day? Any logged workouts will remain but the day will be marked as rest.'
               )
             }
-            className='px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors shadow-sm w-full'
+            className='px-2 py-1 sm:px-4 sm:py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors shadow-sm w-full'
           >
             🔄 Convert to Rest Day
           </button>
@@ -872,7 +929,7 @@ const DayActionsModal = ({
                 'Are you sure you want to convert this to a WORKOUT day?'
               )
             }
-            className='px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-sm w-full'
+            className='px-2 py-1 sm:px-4 sm:py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-sm w-full'
           >
             🔄 Convert to Workout Day
           </button>
@@ -881,20 +938,20 @@ const DayActionsModal = ({
 
       {showConfirmModal && (
         <Modal onClose={() => setShowConfirmModal(false)}>
-          <h3 className='text-xl font-bold text-blue-400 mb-4'>
+          <h3 className='text-xl font-bold text-blue-400 mb-4 mr-[34px]'>
             Confirm Action
           </h3>
           <p className='text-gray-200 mb-6'>{confirmMessage}</p>
           <div className='flex justify-end space-x-3'>
             <button
               onClick={() => setShowConfirmModal(false)}
-              className='px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors'
+              className='px-2 py-1 sm:px-4 sm:py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors'
             >
               Cancel
             </button>
             <button
               onClick={executeConfirmAction}
-              className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors'
+              className='px-2 py-1 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors'
             >
               Confirm
             </button>
@@ -913,6 +970,10 @@ const WorkoutLogPage = ({ selectedDate, setCurrentPage }) => {
   const [currentSets, setCurrentSets] = useState([]) // Array of { reps, weight, restTime } for the current exercise being added
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState('') // 'success' or 'error'
+  const [showConfirmDeleteExerciseModal, setShowConfirmDeleteExerciseModal] =
+    useState(false)
+  const [exerciseToDeleteId, setExerciseToDeleteId] = useState(null)
+  const [exerciseToDeleteName, setExerciseToDeleteName] = useState('')
 
   const formattedDate = formatDate(selectedDate) // YYYY-MM-DD
   // Use a fixed app ID for Firestore path as __app_id is not available locally
@@ -1011,9 +1072,18 @@ const WorkoutLogPage = ({ selectedDate, setCurrentPage }) => {
     }
   }
 
-  const handleDeleteExercise = async (idToDelete) => {
-    if (!db || !userId) return
-    const updatedExercises = exercises.filter((ex) => ex.id !== idToDelete)
+  const handleDeleteExerciseClick = (idToDelete, name) => {
+    setExerciseToDeleteId(idToDelete)
+    setExerciseToDeleteName(name)
+    setShowConfirmDeleteExerciseModal(true)
+  }
+
+  const confirmDeleteExercise = async () => {
+    if (!db || !userId || exerciseToDeleteId === null) return
+
+    const updatedExercises = exercises.filter(
+      (ex) => ex.id !== exerciseToDeleteId
+    )
     setExercises(updatedExercises) // Optimistic update
 
     const workoutDocRef = doc(
@@ -1030,6 +1100,9 @@ const WorkoutLogPage = ({ selectedDate, setCurrentPage }) => {
       )
       setMessage('Exercise deleted successfully!')
       setMessageType('success')
+      setShowConfirmDeleteExerciseModal(false)
+      setExerciseToDeleteId(null)
+      setExerciseToDeleteName('')
     } catch (e) {
       console.error('Error deleting exercise:', e)
       setMessage('Failed to delete exercise.')
@@ -1039,14 +1112,14 @@ const WorkoutLogPage = ({ selectedDate, setCurrentPage }) => {
   }
 
   return (
-    <div className='bg-gray-800 p-6 rounded-xl shadow-lg text-gray-100'>
-      <h2 className='text-2xl font-bold text-blue-400 mb-4'>
+    <div className='bg-gray-800 sm:p-6 p-3 rounded-xl shadow-lg text-gray-100 sm:text-base text-sm'>
+      <h2 className='sm:text-2xl text-lg font-bold text-blue-400 mb-4'>
         🏋️ Workout Log for {selectedDate.toDateString()}
       </h2>
 
       {message && (
         <div
-          className={`p-3 mb-4 rounded-md text-center ${
+          className={`sm:p-3 p-1 mb-4 rounded-md text-center ${
             messageType === 'success'
               ? 'bg-green-800 text-green-200'
               : 'bg-red-800 text-red-200'
@@ -1056,8 +1129,8 @@ const WorkoutLogPage = ({ selectedDate, setCurrentPage }) => {
         </div>
       )}
 
-      <div className='mb-6 bg-gray-700 p-4 rounded-lg shadow-inner'>
-        <h3 className='text-xl font-semibold text-gray-200 mb-3'>
+      <div className='sm:mb-6 mb-3 bg-gray-700 sm:p-4 p-2 rounded-lg shadow-inner'>
+        <h3 className='sm:text-xl text-base font-semibold text-gray-200 mb-3'>
           Add New Exercise
         </h3>
         <input
@@ -1065,51 +1138,55 @@ const WorkoutLogPage = ({ selectedDate, setCurrentPage }) => {
           placeholder='Exercise Name (e.g., Bench Press)'
           value={currentExerciseName}
           onChange={(e) => setCurrentExerciseName(e.target.value)}
-          className='p-3 mb-3 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
+          className='sm:p-3 p-1.5 mb-1.5 sm:mb-3 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 '
         />
 
-        <div className='space-y-2 mb-3'>
+        <div className='space-y-1 sm:space-y-2 mb-3'>
           {currentSets.map((set, index) => (
             <div
               key={index}
-              className='grid grid-cols-4 gap-2 items-center bg-gray-800 p-3 rounded-md'
+              className='grid sm:gap-2 gap-1 items-center bg-gray-800 sm:p-3 p-1 rounded-md'
             >
-              <span className='text-gray-300 font-medium'>
+              <span className='text-gray-300 font-medium '>
                 Set {index + 1}:
               </span>
-              <input
-                type='number'
-                placeholder='Reps'
-                value={set.reps}
-                onChange={(e) => handleUpdateSet(index, 'reps', e.target.value)}
-                className='p-2 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
-              />
-              <input
-                type='number'
-                step='0.1'
-                placeholder='Weight (kg)'
-                value={set.weight}
-                onChange={(e) =>
-                  handleUpdateSet(index, 'weight', e.target.value)
-                }
-                className='p-2 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
-              />
-              <div className='flex items-center space-x-2'>
+              <div className='grid grid-cols-[20%_35%_1fr] w-full sm:gap-2 gap-1 overflow-x-auto pb-1'>
                 <input
-                  type='text'
-                  placeholder='Rest (e.g., 60s)'
-                  value={set.restTime}
+                  type='number'
+                  placeholder='Reps'
+                  value={set.reps}
                   onChange={(e) =>
-                    handleUpdateSet(index, 'restTime', e.target.value)
+                    handleUpdateSet(index, 'reps', e.target.value)
                   }
-                  className='p-2 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 flex-grow'
+                  className='p-1 sm:p-2 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
                 />
-                <button
-                  onClick={() => handleDeleteSet(index)}
-                  className='p-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-sm'
-                >
-                  🗑️
-                </button>
+                <input
+                  type='number'
+                  step='0.1'
+                  placeholder='Weight (kg)'
+                  value={set.weight}
+                  onChange={(e) =>
+                    handleUpdateSet(index, 'weight', e.target.value)
+                  }
+                  className='p-1 sm:p-2 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
+                />
+                <div className='flex items-center sm:space-x-2 space-x-1'>
+                  <input
+                    type='text'
+                    placeholder='Rest (e.g., 60s)'
+                    value={set.restTime}
+                    onChange={(e) =>
+                      handleUpdateSet(index, 'restTime', e.target.value)
+                    }
+                    className='p-1 sm:p-2 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 flex-grow'
+                  />
+                  <button
+                    onClick={() => handleDeleteSet(index)}
+                    className='p-1 sm:p-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-sm'
+                  >
+                    🗑️
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -1117,14 +1194,14 @@ const WorkoutLogPage = ({ selectedDate, setCurrentPage }) => {
 
         <button
           onClick={handleAddSet}
-          className='px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-sm mb-4 w-full'
+          className='px-2 py-1 sm:px-4 sm:py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-sm mb-2 sm:mb-4 w-full'
         >
           ➕ Add Set
         </button>
 
         <button
           onClick={handleAddExercise}
-          className='px-4 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-sm w-full'
+          className='px-2 py-1 sm:px-4 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-sm w-full'
         >
           Add Exercise to Log
         </button>
@@ -1144,21 +1221,45 @@ const WorkoutLogPage = ({ selectedDate, setCurrentPage }) => {
                 className='bg-gray-700 p-4 rounded-lg shadow-md'
               >
                 <div className='flex justify-between items-center mb-2'>
-                  <p className='font-semibold text-blue-300 text-lg'>
+                  <p className='font-semibold py-2 px-5 bg-gray-900 rounded-md text-blue-300 text-lg'>
                     {exercise.name}
                   </p>
                   <button
-                    onClick={() => handleDeleteExercise(exercise.id)}
-                    className='px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-sm text-sm'
+                    onClick={() =>
+                      handleDeleteExerciseClick(exercise.id, exercise.name)
+                    }
+                    className='px-1.5 py-1 sm:px-3 sm:py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-sm text-sm'
                   >
-                    🗑️ Delete Exercise
+                    🗑️ Delete
                   </button>
                 </div>
-                <div className='space-y-1'>
+                <div className='space-y-2'>
                   {exercise.sets.map((set, index) => (
-                    <p key={index} className='text-sm text-gray-300'>
-                      Set {index + 1}: {set.reps} reps @ {set.weight} kg{' '}
-                      {set.restTime && `(Rest: ${set.restTime})`}
+                    <p
+                      key={index}
+                      className='text-sm text-gray-300 flex flex-col gap-2 mt-4'
+                    >
+                      <span className='py-2 px-5 bg-teal-600 rounded-md font-semibold w-fit sm:text-lg text-base'>
+                        Set {index + 1}:
+                      </span>
+                      <span className='flex gap-2 sm:gap-4 text-gray-900 text-xs sm:text-sm w-full'>
+                        {set.reps && (
+                          <span className='rounded-md bg-orange-400 p-2 w-full'>
+                            Reps :<br /> {set.reps}
+                          </span>
+                        )}
+                        {set.weight && (
+                          <span className='rounded-md bg-red-400 p-2 w-full'>
+                            Weight :<br /> {set.weight} kg{' '}
+                          </span>
+                        )}
+                        {set.restTime && (
+                          <span className='rounded-md bg-blue-400 p-2 w-full'>
+                            Rest:
+                            <br /> {set.restTime}
+                          </span>
+                        )}
+                      </span>
                     </p>
                   ))}
                 </div>
@@ -1176,6 +1277,35 @@ const WorkoutLogPage = ({ selectedDate, setCurrentPage }) => {
           ⬅️ Back to Calendar
         </button>
       </div>
+
+      {showConfirmDeleteExerciseModal && (
+        <Modal onClose={() => setShowConfirmDeleteExerciseModal(false)}>
+          <h3 className='text-xl font-bold text-red-400 mb-4 mr-[34px]'>
+            Confirm Deletion
+          </h3>
+          <p className='text-gray-200 mb-6'>
+            Are you sure you want to delete the exercise "
+            <span className='font-semibold text-blue-300'>
+              {exerciseToDeleteName}
+            </span>
+            " from this workout log? This action cannot be undone.
+          </p>
+          <div className='flex justify-end space-x-3'>
+            <button
+              onClick={() => setShowConfirmDeleteExerciseModal(false)}
+              className='px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors'
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmDeleteExercise}
+              className='px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors'
+            >
+              Delete Exercise
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
@@ -1317,8 +1447,8 @@ const MeasurementsPage = ({
   )
 
   return (
-    <div className='bg-gray-800 p-6 rounded-xl shadow-lg text-gray-100'>
-      <h2 className='text-2xl font-bold text-blue-400 mb-6'>
+    <div className='bg-gray-800 sm:p-6 p-3 rounded-xl shadow-lg text-gray-100'>
+      <h2 className='sm:text-2xl text-xl font-bold text-blue-400 mb-6'>
         📏 Monthly Measurements
       </h2>
 
@@ -1345,9 +1475,9 @@ const MeasurementsPage = ({
               )
             )
           }
-          className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm'
+          className='sm:px-4 px-2 py-1 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm'
         >
-          Previous Year
+          Prev Year
         </button>
         <h3 className='text-xl font-semibold text-gray-200'>
           {selectedMonth.getFullYear()}
@@ -1362,7 +1492,7 @@ const MeasurementsPage = ({
               )
             )
           }
-          className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm'
+          className='sm:px-4 px-2 py-1 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm'
         >
           Next Year
         </button>
@@ -1374,12 +1504,12 @@ const MeasurementsPage = ({
           placeholder='Year'
           value={searchYear}
           onChange={(e) => setSearchYear(parseInt(e.target.value) || '')}
-          className='p-3 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 flex-grow'
+          className='p-1.5 sm:p-3 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 flex-grow'
         />
         <select
           value={searchMonth}
           onChange={(e) => setSearchMonth(parseInt(e.target.value))}
-          className='p-3 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 flex-grow'
+          className='p-1.5 sm:p-3 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 flex-grow'
         >
           {months.map((month, index) => (
             <option key={month} value={index + 1}>
@@ -1389,13 +1519,13 @@ const MeasurementsPage = ({
         </select>
         <button
           onClick={handleSearchMonth}
-          className='px-4 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-sm'
+          className='sm:px-4 px-2 py-1.5 sm:py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-sm'
         >
           🔍 Go to Month
         </button>
       </div>
 
-      <div className='grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'>
+      <div className='grid grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4'>
         {months.map((monthName, index) => {
           const monthDate = new Date(selectedMonth.getFullYear(), index, 1)
           const monthKey = formatDate(monthDate)
@@ -1413,7 +1543,7 @@ const MeasurementsPage = ({
           return (
             <div
               key={monthName}
-              className={`p-4 rounded-lg shadow-md flex flex-col items-center justify-center transition-all duration-200
+              className={`p-1 sm:p-2 md:p-4 rounded-lg shadow-md flex flex-col items-center justify-center transition-all duration-200
                 ${
                   hasMeaningfulMeasurements
                     ? 'bg-green-700 hover:bg-green-600'
@@ -1428,7 +1558,7 @@ const MeasurementsPage = ({
               `}
               onClick={() => handleMonthClick(index)}
             >
-              <span className='text-xl font-bold text-gray-100'>
+              <span className='text-sm sm:text-base md:text-lg lg:text-xl font-bold text-gray-100'>
                 {monthName}
               </span>
               <span className='text-sm mt-1'>
@@ -1462,25 +1592,6 @@ const MeasurementsPage = ({
               .catch((e) => {
                 console.error('Error saving measurement:', e)
                 setMessage('Failed to save measurement.')
-                setMessageType('error')
-              })
-          }}
-          onDelete={(dateKey) => {
-            deleteDoc(
-              doc(
-                db,
-                `artifacts/${appId}/users/${userId}/measurements`,
-                dateKey
-              )
-            )
-              .then(() => {
-                setMessage('Measurement deleted successfully!')
-                setMessageType('success')
-                setShowMeasurementModal(false)
-              })
-              .catch((e) => {
-                console.error('Error deleting measurement:', e)
-                setMessage('Failed to delete measurement.')
                 setMessageType('error')
               })
           }}
@@ -1527,30 +1638,28 @@ const MeasurementsPage = ({
 }
 
 // Measurement Modal Component
-const MeasurementModal = ({
-  monthData,
-  onClose,
-  onSave,
-  onDelete,
-  onClearData,
-}) => {
-  const [formData, setFormData] = useState(monthData)
+const MeasurementModal = ({ monthData, onClose, onSave, onClearData }) => {
+  // Initialize formData ensuring imageUrls is an array
+  const [formData, setFormData] = useState(() => {
+    const initialData = monthData || {}
+    return {
+      ...initialData,
+      imageUrls:
+        initialData.imageUrls && Array.isArray(initialData.imageUrls)
+          ? initialData.imageUrls.length > 0
+            ? initialData.imageUrls
+            : [{ url: '', label: '' }]
+          : [{ url: '', label: '' }],
+    }
+  })
   const [showImagePreview, setShowImagePreview] = useState(false)
   const [previewImageUrl, setPreviewImageUrl] = useState('')
+  const [previewImageLabel, setPreviewImageLabel] = useState('')
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState('')
   const [showConfirmClearModal, setShowConfirmClearModal] = useState(false)
 
-  // Initialize imageUrls with at least one empty entry if none exist
-  useEffect(() => {
-    // Ensure imageUrls is always an array, even if it's undefined or null from Firestore
-    if (!formData.imageUrls) {
-      setFormData((prev) => ({ ...prev, imageUrls: [{ url: '', label: '' }] }))
-    } else if (formData.imageUrls.length === 0) {
-      // If it's an empty array, still ensure at least one input field is shown
-      setFormData((prev) => ({ ...prev, imageUrls: [{ url: '', label: '' }] }))
-    }
-  }, [formData.imageUrls]) // Depend on formData.imageUrls to react to changes
+  // No need for useEffect to initialize imageUrls if useState init is robust
 
   const handleFieldChange = (e) => {
     const { name, value } = e.target
@@ -1585,8 +1694,9 @@ const MeasurementModal = ({
     }))
   }
 
-  const handleImageClick = (url) => {
+  const handleImageClick = (url, label) => {
     setPreviewImageUrl(url)
+    setPreviewImageLabel(label)
     setShowImagePreview(true)
   }
 
@@ -1605,7 +1715,7 @@ const MeasurementModal = ({
 
   return (
     <Modal onClose={onClose}>
-      <h3 className='text-xl font-bold text-blue-400 mb-4'>
+      <h3 className='text-lg sm:text-xl font-bold text-blue-400 mb-4 mr-[34px]'>
         Measurements for{' '}
         {new Date(formData.date).toLocaleString('default', {
           month: 'long',
@@ -1614,7 +1724,7 @@ const MeasurementModal = ({
       </h3>
       {message && (
         <div
-          className={`p-3 mb-4 rounded-md text-center ${
+          className={`sm:p-3 sm:mb-4 p-1.5 mb-2 rounded-md text-center ${
             messageType === 'success'
               ? 'bg-green-800 text-green-200'
               : 'bg-red-800 text-red-200'
@@ -1624,13 +1734,11 @@ const MeasurementModal = ({
         </div>
       )}
       {/* Scrollable Content Area */}
-      <div className='overflow-y-auto max-h-[70vh] pr-2 -mr-2 '>
-        {' '}
-        {/* Added pr-2 -mr-2 for scrollbar */}
-        <div className='grid grid-cols-1 md:grid-cols-2 gap-4 mb-4'>
+      <div className='overflow-y-scroll overflow-x-hidden max-h-[70vh] pr-2'>
+        <div className='grid grid-cols-1 md:grid-cols-2 sm:gap-4 gap-2 mb-4 text-sm sm:text-base'>
           {measurementFields.map((field) => (
             <label key={field.key} className='block'>
-              <span className='text-gray-300'>
+              <span className='text-gray-300 sm:text-base text-sm'>
                 {field.label} {field.optional && '(Optional)'}:
               </span>
               <input
@@ -1640,31 +1748,33 @@ const MeasurementModal = ({
                 placeholder={field.label}
                 value={formData[field.key] || ''}
                 onChange={handleFieldChange}
-                className='p-3 mt-1 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
+                className='sm:p-3 p-1.5 mt-1 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 text-sm sm:text-base'
               />
             </label>
           ))}
           <label className='block col-span-full'>
-            <span className='text-gray-300'>Notes (optional):</span>
+            <span className='text-gray-300 text-sm sm:text-base'>
+              Notes (optional):
+            </span>
             <textarea
               name='notes'
               placeholder="Any additional notes for this month's measurements..."
               value={formData.notes || ''}
               onChange={handleFieldChange}
               rows='3'
-              className='p-3 mt-1 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
+              className='sm:p-3 p-1.5 mt-1 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 text-sm sm:text-base'
             ></textarea>
           </label>
         </div>
         <h4 className='text-lg font-semibold text-gray-200 mb-2'>
           Physique Pictures
         </h4>
-        <div className='space-y-3 mb-4'>
+        <div className='space-y-3 mb-4 flex flex-col '>
           {/* Ensure formData.imageUrls is an array before mapping */}
           {(formData.imageUrls || []).map((img, index) => (
             <div
               key={index}
-              className='flex flex-col sm:flex-row gap-2 items-center'
+              className='flex gap-2 overflow-x-auto text-sm sm:text-base pb-1'
             >
               <input
                 type='url'
@@ -1673,7 +1783,7 @@ const MeasurementModal = ({
                 onChange={(e) =>
                   handleImageURLChange(index, 'url', e.target.value)
                 }
-                className='flex-grow p-3 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
+                className='flex-grow sm:p-3 p-1.5 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
               />
               <input
                 type='text'
@@ -1682,12 +1792,12 @@ const MeasurementModal = ({
                 onChange={(e) =>
                   handleImageURLChange(index, 'label', e.target.value)
                 }
-                className='flex-grow p-3 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
+                className='flex-grow sm:p-3 p-1.5 bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
               />
               {(formData.imageUrls || []).length > 1 && ( // Allow removing if more than one field
                 <button
                   onClick={() => handleRemoveImageField(index)}
-                  className='p-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-sm'
+                  className='sm:p-2 p-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-sm sm:mr-1'
                 >
                   🗑️
                 </button>
@@ -1697,7 +1807,7 @@ const MeasurementModal = ({
           {(formData.imageUrls || []).length < 10 && (
             <button
               onClick={handleAddImageField}
-              className='px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-sm w-full'
+              className='px-2 py-1 sm:px-4 sm:py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-sm w-full text-sm sm:text-base'
             >
               ➕ Add Another Image
             </button>
@@ -1710,24 +1820,24 @@ const MeasurementModal = ({
               <h4 className='font-semibold text-gray-200 mb-2'>
                 Current Images:
               </h4>
-              <div className='grid grid-cols-2 gap-4'>
+              <div className='flex overflow-x-auto sm:gap-4 gap-2 pb-3'>
                 {formData.imageUrls
                   .filter((img) => img.url)
                   .map((img, idx) => (
                     <div
                       key={idx}
-                      className='bg-gray-900 p-2 rounded-lg shadow-inner cursor-pointer'
-                      onClick={() => handleImageClick(img.url)}
+                      className='bg-gray-900 p-2 rounded-lg shadow-inner cursor-pointer w-fit max-w-[110px] sm:max-w-[160px] md:max-w-[210px] '
+                      onClick={() => handleImageClick(img.url, img.label)}
                     >
                       {img.label && (
-                        <p className='text-xs text-gray-400 mb-1'>
+                        <p className='text-xs text-gray-400 mb-1 truncate'>
                           {img.label}
                         </p>
                       )}
                       <img
                         src={img.url}
                         alt={img.label || `Physique Image ${idx + 1}`}
-                        className='w-full h-32 object-cover rounded-md mb-1'
+                        className='w-full object-cover rounded-md mb-2 max-w-[100px] max-h-[100px] sm:max-w-[150px] sm:max-h-[150px] md:max-w-[200px] md:max-h-[200px] overflow-hidden bg-center mx-auto '
                         onError={(e) => {
                           e.target.onerror = null
                           e.target.src =
@@ -1742,34 +1852,35 @@ const MeasurementModal = ({
               </div>
             </div>
           )}
-        <div className='flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3 mt-6 pt-4 border-t border-gray-700'>
-          {/* Only show clear if there's any data for this month (even if it's just an empty object from a previous save) */}
-          {Object.keys(monthData).length > 1 && ( // Check if monthData has more than just 'date'
-            <button
-              onClick={() => setShowConfirmClearModal(true)}
-              className='px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors shadow-sm'
-            >
-              🧹 Clear Data
-            </button>
-          )}
-          <button
-            onClick={() => onSave(formData)}
-            className='px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-sm'
-          >
-            Save Measurement
-          </button>
-        </div>
       </div>{' '}
       {/* End of scrollable content */}
+      <div className='flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3 mt-6 pt-4 border-t border-gray-700'>
+        {/* Only show clear if there's any data for this month (even if it's just an empty object from a previous save) */}
+        {Object.keys(monthData).length > 1 && ( // Check if monthData has more than just 'date'
+          <button
+            onClick={() => setShowConfirmClearModal(true)}
+            className='px-2 py-1 sm:px-4 sm:py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors shadow-sm'
+          >
+            🧹 Clear Data
+          </button>
+        )}
+        <button
+          onClick={() => onSave(formData)}
+          className='px-2 py-1 sm:px-4 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-sm'
+        >
+          Save Measurement
+        </button>
+      </div>
       {showImagePreview && (
         <ImagePreviewModal
           imageUrl={previewImageUrl}
+          imageLabel={previewImageLabel}
           onClose={() => setShowImagePreview(false)}
         />
       )}
       {showConfirmClearModal && (
         <Modal onClose={() => setShowConfirmClearModal(false)}>
-          <h3 className='text-xl font-bold text-blue-400 mb-4'>
+          <h3 className='text-xl font-bold text-blue-400 mb-4 mr-[34px]'>
             Confirm Clear Data
           </h3>
           <p className='text-gray-200 mb-6'>
@@ -1780,7 +1891,7 @@ const MeasurementModal = ({
           <div className='flex justify-end space-x-3'>
             <button
               onClick={() => setShowConfirmClearModal(false)}
-              className='px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors'
+              className='px-2 py-1 sm:px-4 sm:py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors'
             >
               Cancel
             </button>
@@ -1789,7 +1900,7 @@ const MeasurementModal = ({
                 onClearData(formData.date)
                 setShowConfirmClearModal(false)
               }}
-              className='px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors'
+              className='px-2 py-1 sm:px-4 sm:py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors'
             >
               Clear Data
             </button>
@@ -1801,21 +1912,28 @@ const MeasurementModal = ({
 }
 
 // Image Preview Modal
-const ImagePreviewModal = ({ imageUrl, onClose }) => {
+const ImagePreviewModal = ({ imageUrl, onClose, imageLabel }) => {
   return (
-    <div className='fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center p-4 z-50'>
-      <div className='bg-gray-800 p-4 rounded-xl shadow-lg relative max-w-4xl w-full h-auto max-h-[90vh] flex flex-col'>
-        <button
-          onClick={onClose}
-          className='absolute top-3 right-3 text-gray-400 hover:text-gray-100 text-3xl font-bold z-10'
-        >
-          &times;
-        </button>
-        <div className='flex-grow flex items-center justify-center overflow-auto'>
+    <div className='fixed inset-0 bg-gray-900 bg-opacity-90 flex justify-center items-center sm:p-4 p-2 z-50 '>
+      <div className='bg-gray-800 sm:p-4 p-2 rounded-xl shadow-lg relative max-w-[500px] max-h-[90vh] border border-gray-400 flex flex-col '>
+        <div className='flex gap-1 justify-between'>
+          {imageLabel && (
+            <p className='text-xs text-gray-400 mb-1 mr-[50px] text-wrap break-all'>
+              {imageLabel}
+            </p>
+          )}
+          <button
+            onClick={onClose}
+            className=' absolute top-0 right-0 text-gray-400 hover:text-gray-100 text-3xl z-10 w-[50px] h-[35px] bg-gray-800 flex items-center justify-center rounded-bl-xl rounded-tr-xl'
+          >
+            &times;
+          </button>
+        </div>
+        <div className='flex justify-center items-center overflow-hidden rounded-lg'>
           <img
             src={imageUrl}
             alt='Full size preview'
-            className='max-w-full max-h-full object-contain rounded-lg'
+            className='w-auto h-auto max-w-full max-h-full object-contain rounded-lg mx-auto'
             onError={(e) => {
               e.target.onerror = null
               e.target.src =
@@ -1823,6 +1941,11 @@ const ImagePreviewModal = ({ imageUrl, onClose }) => {
             }}
           />
         </div>
+        {imageUrl && (
+          <p className='text-xs text-gray-400 mb-1 mt-3 break-all text-wrap'>
+            {imageUrl}
+          </p>
+        )}
       </div>
     </div>
   )
@@ -1838,7 +1961,6 @@ const StatisticsPage = ({ setCurrentPage }) => {
 
   // Use a fixed app ID for Firestore path as __app_id is not available locally
   const appId = 'workout-tracker-app-local' // Or any unique string for your local app
-
   // Helper to check if measurement data is effectively empty
   const isEmptyMeasurementData = (data) => {
     if (!data) return true // No data at all means empty
@@ -1954,8 +2076,8 @@ const StatisticsPage = ({ setCurrentPage }) => {
   )
 
   return (
-    <div className='bg-gray-800 p-6 rounded-xl shadow-lg text-gray-100'>
-      <h2 className='text-2xl font-bold text-blue-400 mb-6'>
+    <div className='bg-gray-800 sm:p-6 p-3 rounded-xl shadow-lg text-gray-100'>
+      <h2 className=' sm:text-2xl text-xl font-bold text-blue-400 mb-6'>
         📊 Statistics & Progress
       </h2>
 
@@ -1971,16 +2093,16 @@ const StatisticsPage = ({ setCurrentPage }) => {
         </div>
       )}
 
-      <div className='mb-8 bg-gray-700 p-4 rounded-lg shadow-inner'>
-        <h3 className='text-xl font-semibold text-gray-200 mb-3'>
+      <div className='mb-8 bg-gray-700 sm:p-4 p-2.5 rounded-lg shadow-inner'>
+        <h3 className='sm:text-xl text-lg font-semibold text-gray-200 sm:mb-3 mb-1.5'>
           Yearly Workout Summary
         </h3>
         {sortedYears.length === 0 ? (
           <p className='text-gray-400'>No workout data available yet.</p>
         ) : (
-          <div className='space-y-3'>
+          <div className='sm:space-y-3 space-y-1.5'>
             {sortedYears.map((year) => (
-              <div key={year} className='bg-gray-800 p-3 rounded-md'>
+              <div key={year} className='bg-gray-800 p-2 sm:p-3 rounded-md'>
                 <p className='text-lg font-bold text-blue-300'>Year: {year}</p>
                 <p className='text-gray-300'>
                   Workout Days:{' '}
@@ -2001,7 +2123,7 @@ const StatisticsPage = ({ setCurrentPage }) => {
       </div>
 
       <div className='mb-6'>
-        <h3 className='text-xl font-semibold text-gray-200 mb-3'>
+        <h3 className='text-xl font-semibold text-gray-200 mb-3 '>
           Measurement History
         </h3>
         {measurements.length === 0 ? (
@@ -2009,71 +2131,7 @@ const StatisticsPage = ({ setCurrentPage }) => {
         ) : (
           <div className='space-y-4'>
             {measurements.map((m) => (
-              <div key={m.id} className='bg-gray-700 p-4 rounded-lg shadow-md'>
-                <div className='flex justify-between items-center mb-2'>
-                  <p className='font-semibold text-blue-300 text-lg'>
-                    {m.date}
-                  </p>
-                </div>
-                <div className='grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray-300 mb-3'>
-                  {m.weight !== null && <p>Weight: {m.weight} kg</p>}
-                  {m.bodyFat !== null && <p>Body Fat: {m.bodyFat} %</p>}
-                  <p>Chest: {m.chest} in</p>
-                  <p>Waist: {m.waist} in</p>
-                  <p>Neck: {m.neck} in</p>
-                  <p>Forearms: {m.forearms} in</p>
-                  <p>Arms: {m.arms} in</p>
-                  <p>Hips: {m.hips} in</p>
-                  <p>Legs: {m.legs} in</p>
-                  <p>Calves: {m.calves} in</p>
-                </div>
-                {m.notes && (
-                  <p className='text-sm text-gray-400 italic mb-3'>
-                    Notes: {m.notes}
-                  </p>
-                )}
-
-                {m.imageUrls && m.imageUrls.length > 0 && (
-                  <div className='mt-4'>
-                    <h4 className='font-semibold text-gray-200 mb-2'>
-                      Physique Images:
-                    </h4>
-                    <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4'>
-                      {m.imageUrls.map(
-                        (img, idx) =>
-                          img.url && (
-                            <div
-                              key={idx}
-                              className='bg-gray-900 p-2 rounded-lg shadow-inner cursor-pointer'
-                              onClick={() => {
-                                /* This click handler is for display only, actual preview comes from MeasurementModal */
-                              }}
-                            >
-                              {img.label && (
-                                <p className='text-xs text-gray-400 mb-1'>
-                                  {img.label}
-                                </p>
-                              )}
-                              <img
-                                src={img.url}
-                                alt={img.label || `Physique Image ${idx + 1}`}
-                                className='w-full h-48 object-cover rounded-md mb-2'
-                                onError={(e) => {
-                                  e.target.onerror = null
-                                  e.target.src =
-                                    'https://placehold.co/300x200/4a5568/a0aec0?text=Image+Load+Error'
-                                }}
-                              />
-                              <p className='text-xs text-gray-500 truncate'>
-                                {img.url}
-                              </p>
-                            </div>
-                          )
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <MeasurementData key={m.id} m={m} />
             ))}
           </div>
         )}
@@ -2090,7 +2148,118 @@ const StatisticsPage = ({ setCurrentPage }) => {
     </div>
   )
 }
-
+const MeasurementData = ({ m }) => {
+  const [showMeasurement, setShowMeasurement] = useState(false)
+  const [showImagePreview, setShowImagePreview] = useState(false)
+  const [previewImageUrl, setPreviewImageUrl] = useState('')
+  const [previewImageLabel, setPreviewImageLabel] = useState('')
+  const handleImageClick = (url, label) => {
+    setPreviewImageUrl(url)
+    setPreviewImageLabel(label)
+    setShowImagePreview(true)
+  }
+  return (
+    <div className='bg-gray-700 sm:p-4 px-2 py-3 rounded-lg shadow-md'>
+      <div className='flex justify-between items-center'>
+        <p className='font-semibold text-blue-300 text-base sm:text-lg py-1 px-4 rounded-md bg-gray-900'>
+          {m.date}
+        </p>
+        <button
+          onClick={() => setShowMeasurement(!showMeasurement)}
+          className='bg-gray-900 px-4 py-1.5 rounded-md text-sm sm:text-base text-gray-400'
+        >
+          {showMeasurement ? 'Hide' : 'Show'}
+        </button>
+      </div>
+      <div className={`${showMeasurement ? 'block' : 'hidden'} mt-2`}>
+        <div className='grid grid-cols-2 sm:gap-x-4 gap-x-2 gap-y-1 text-sm text-gray-300 mb-4'>
+          <span className='px-2 py-1 bg-gray-800 rounded-md'>
+            Weight: {m.weight} kg
+          </span>
+          <span className='px-2 py-1 bg-gray-800 rounded-md'>
+            Body Fat: {m.bodyFat} %
+          </span>
+          <span className='px-2 py-1 bg-gray-800 rounded-md'>
+            Chest: {m.chest} in
+          </span>
+          <span className='px-2 py-1 bg-gray-800 rounded-md'>
+            Waist: {m.waist} in
+          </span>
+          <span className='px-2 py-1 bg-gray-800 rounded-md'>
+            Neck: {m.neck} in
+          </span>
+          <span className='px-2 py-1 bg-gray-800 rounded-md'>
+            Forearms: {m.forearms} in
+          </span>
+          <span className='px-2 py-1 bg-gray-800 rounded-md'>
+            Arms: {m.arms} in
+          </span>
+          <span className='px-2 py-1 bg-gray-800 rounded-md'>
+            Hips: {m.hips} in
+          </span>
+          <span className='px-2 py-1 bg-gray-800 rounded-md'>
+            Legs: {m.legs} in
+          </span>
+          <span className='px-2 py-1 bg-gray-800 rounded-md'>
+            Calves: {m.calves} in
+          </span>
+        </div>
+        {m.notes && (
+          <p className='text-sm text-gray-400 italic mb-5 border border-gray-400 p-1 sm:p-2 rounded-md'>
+            Notes: {m.notes}
+          </p>
+        )}
+        {showImagePreview && (
+          <ImagePreviewModal
+            imageUrl={previewImageUrl}
+            imageLabel={previewImageLabel}
+            onClose={() => setShowImagePreview(false)}
+          />
+        )}
+        {m.imageUrls && m.imageUrls.length > 0 && (
+          <div className='mt-4'>
+            <h4 className='font-semibold text-gray-200 mb-4'>
+              Physique Images:
+            </h4>
+            <div className='flex overflow-x-auto sm:gap-4 gap-2 pb-3'>
+              {m.imageUrls.map(
+                (img, idx) =>
+                  img.url && (
+                    <div
+                      key={idx}
+                      className='bg-gray-900 p-2 rounded-lg shadow-inner cursor-pointer w-fit max-w-[110px] sm:max-w-[160px] md:max-w-[210px] '
+                      onClick={() => {
+                        handleImageClick(img.url, img.label)
+                      }}
+                    >
+                      {img.label && (
+                        <p className='text-xs text-gray-400 mb-1 truncate'>
+                          {img.label}
+                        </p>
+                      )}
+                      <img
+                        src={img.url}
+                        alt={img.label || `Physique Image ${idx + 1}`}
+                        className='w-full object-cover rounded-md mb-2 max-w-[100px] max-h-[100px] sm:max-w-[150px] sm:max-h-[150px] md:max-w-[200px] md:max-h-[200px] overflow-hidden bg-center mx-auto '
+                        onError={(e) => {
+                          e.target.onerror = null
+                          e.target.src =
+                            'https://placehold.co/300x200/4a5568/a0aec0?text=Image+Load+Error'
+                        }}
+                      />
+                      <p className='text-xs text-gray-500 truncate'>
+                        {img.url}
+                      </p>
+                    </div>
+                  )
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 // Settings Page Component
 const SettingsPage = ({ setCurrentPage }) => {
   const { db, auth, userId, isAuthReady } = useContext(FirebaseContext)
@@ -2234,12 +2403,14 @@ const SettingsPage = ({ setCurrentPage }) => {
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
   return (
-    <div className='bg-gray-800 p-6 rounded-xl shadow-lg text-gray-100'>
-      <h2 className='text-2xl font-bold text-blue-400 mb-6'>⚙️ Settings</h2>
+    <div className='bg-gray-800 sm:p-6 p-3 rounded-xl shadow-lg text-gray-100'>
+      <h2 className='sm:text-2xl text-xl font-bold text-blue-400 mb-6'>
+        ⚙️ Settings
+      </h2>
 
       {message && (
         <div
-          className={`p-3 mb-4 rounded-md text-center ${
+          className={`sm:p-3 p-1.5 mb-4 rounded-md text-center ${
             messageType === 'success'
               ? 'bg-green-800 text-green-200'
               : messageType === 'error'
@@ -2251,19 +2422,19 @@ const SettingsPage = ({ setCurrentPage }) => {
         </div>
       )}
 
-      <div className='mb-8 bg-gray-700 p-4 rounded-lg shadow-inner'>
-        <h3 className='text-xl font-semibold text-gray-200 mb-3'>
+      <div className='mb-8 bg-gray-700 p-2 sm:p-4 rounded-lg shadow-inner'>
+        <h3 className='sm:text-xl text-lg font-semibold text-gray-200 mb-2 sm:mb-3'>
           Calendar Preferences
         </h3>
         <div className='mb-4'>
-          <label className='block text-gray-200 font-semibold mb-2'>
+          <label className='block text-gray-300 font-semibold mb-2 '>
             Workout Days:
           </label>
-          <div className='flex flex-wrap gap-2'>
+          <div className='flex flex-wrap gap-1 sm:gap-2'>
             {daysOfWeek.map((day, index) => (
               <label
                 key={`workout-${index}`}
-                className='flex items-center space-x-2 bg-gray-600 p-2 rounded-md cursor-pointer hover:bg-gray-500 transition-colors'
+                className='flex items-center sm:space-x-2 space-x-1 bg-gray-600 py-1 px-2 sm:p-2 rounded-md cursor-pointer hover:bg-gray-500 transition-colors'
               >
                 <input
                   type='checkbox'
@@ -2279,7 +2450,7 @@ const SettingsPage = ({ setCurrentPage }) => {
                       workoutDaysOfWeek: newDays,
                     }))
                   }}
-                  className='form-checkbox h-5 w-5 text-blue-500 rounded-md bg-gray-700 border-gray-500 checked:bg-blue-500'
+                  className='form-checkbox h-3 w-3 sm:h-5 sm:w-5 text-blue-500 rounded-md bg-gray-700 border-gray-500 checked:bg-blue-500'
                 />
                 <span>{day}</span>
               </label>
@@ -2287,14 +2458,14 @@ const SettingsPage = ({ setCurrentPage }) => {
           </div>
         </div>
         <div className='mb-6'>
-          <label className='block text-gray-200 font-semibold mb-2'>
+          <label className='block text-gray-300 font-semibold mb-2 '>
             Rest Days:
           </label>
-          <div className='flex flex-wrap gap-2'>
+          <div className='flex flex-wrap gap-1 sm:gap-2'>
             {daysOfWeek.map((day, index) => (
               <label
                 key={`rest-${index}`}
-                className='flex items-center space-x-2 bg-gray-600 p-2 rounded-md cursor-pointer hover:bg-gray-500 transition-colors'
+                className='flex items-center sm:space-x-2 space-x-1 bg-gray-600 rounded-md cursor-pointer hover:bg-gray-500 transition-colors py-1 px-2 sm:p-2'
               >
                 <input
                   type='checkbox'
@@ -2310,7 +2481,7 @@ const SettingsPage = ({ setCurrentPage }) => {
                       restDaysOfWeek: newDays,
                     }))
                   }}
-                  className='form-checkbox h-5 w-5 text-red-500 rounded-md bg-gray-700 border-gray-500 checked:bg-red-500'
+                  className='form-checkbox text-red-500 rounded-md bg-gray-700 border-gray-500 checked:bg-red-500 h-3 w-3 sm:h-5 sm:w-5'
                 />
                 <span>{day}</span>
               </label>
@@ -2319,25 +2490,34 @@ const SettingsPage = ({ setCurrentPage }) => {
         </div>
         <button
           onClick={handleSaveSettings}
-          className='w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-sm'
+          className='w-full px-2 py-1 sm:px-4 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-sm'
         >
           Save Calendar Settings
         </button>
       </div>
-
-      <div className='bg-gray-700 p-4 rounded-lg shadow-inner space-y-4'>
+      <div className='bg-gray-700 p-4 rounded-lg shadow-inner space-x-4 mb-8'>
+        {userId && (
+          <span className='text-sm text-gray-400'>
+            User ID:{' '}
+            <span className='font-mono text-blue-300 text-wrap break-all'>
+              {userId}
+            </span>
+          </span>
+        )}
+      </div>
+      <div className='bg-gray-700 p-2 sm:p-4 rounded-lg shadow-inner space-y-4'>
         <h3 className='text-xl font-semibold text-gray-200 mb-3'>
           Account Actions
         </h3>
         <button
           onClick={() => setShowConfirmSignOutModal(true)}
-          className='w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-sm'
+          className='w-full px-2 py-1 sm:px-4 sm:py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-sm'
         >
           Sign Out
         </button>
         <button
           onClick={() => setShowConfirmDeleteAccountModal(true)}
-          className='w-full px-4 py-2 bg-red-800 text-white rounded-md hover:bg-red-900 transition-colors shadow-sm'
+          className='w-full px-2 py-1 sm:px-4 sm:py-2 bg-red-800 text-white rounded-md hover:bg-red-900 transition-colors shadow-sm'
         >
           ⚠️ Clear All Account Data
         </button>
@@ -2354,7 +2534,7 @@ const SettingsPage = ({ setCurrentPage }) => {
 
       {showConfirmSignOutModal && (
         <Modal onClose={() => setShowConfirmSignOutModal(false)}>
-          <h3 className='text-xl font-bold text-blue-400 mb-4'>
+          <h3 className='text-xl font-bold text-blue-400 mb-4 mr-[34px]'>
             Confirm Sign Out
           </h3>
           <p className='text-gray-200 mb-6'>
@@ -2363,13 +2543,13 @@ const SettingsPage = ({ setCurrentPage }) => {
           <div className='flex justify-end space-x-3'>
             <button
               onClick={() => setShowConfirmSignOutModal(false)}
-              className='px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors'
+              className='px-2 py-1 sm:px-4 sm:py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors'
             >
               Cancel
             </button>
             <button
               onClick={handleSignOut}
-              className='px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors'
+              className='px-2 py-1 sm:px-4 sm:py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors'
             >
               Sign Out
             </button>
@@ -2379,7 +2559,7 @@ const SettingsPage = ({ setCurrentPage }) => {
 
       {showConfirmDeleteAccountModal && (
         <Modal onClose={() => setShowConfirmDeleteAccountModal(false)}>
-          <h3 className='text-xl font-bold text-red-400 mb-4'>
+          <h3 className='text-xl font-bold text-red-400 mb-4 mr-[34px]'>
             Confirm Account Deletion
           </h3>
           <p className='text-gray-200 mb-6'>
@@ -2393,13 +2573,13 @@ const SettingsPage = ({ setCurrentPage }) => {
           <div className='flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3'>
             <button
               onClick={() => setShowConfirmDeleteAccountModal(false)}
-              className='px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors'
+              className='px-2 py-1 sm:px-4 sm:py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors'
             >
               Cancel
             </button>
             <button
               onClick={handleDeleteAllAccountData}
-              className='px-4 py-2 bg-red-800 text-white rounded-md hover:bg-red-900 transition-colors'
+              className='px-2 py-1 sm:px-4 sm:py-2 bg-red-800 text-white rounded-md hover:bg-red-900 transition-colors'
             >
               Delete All My Data
             </button>
@@ -2413,8 +2593,8 @@ const SettingsPage = ({ setCurrentPage }) => {
 // Generic Modal Component
 const Modal = ({ children, onClose }) => {
   return (
-    <div className='fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center px-4 py-10 z-50'>
-      <div className='bg-gray-800 p-6 rounded-xl shadow-lg max-w-lg w-full relative text-gray-100'>
+    <div className='fixed inset-0 bg-gray-900 bg-opacity-75 flex  justify-center px-4 py-10 z-50  overflow-auto '>
+      <div className='bg-gray-800 p-3 sm:p-6 rounded-xl shadow-lg max-w-lg w-full h-fit relative text-gray-100'>
         <button
           onClick={onClose}
           className='absolute top-3 right-3 text-gray-400 hover:text-gray-100 text-2xl font-bold'

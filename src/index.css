@@ -1,3 +1,56 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom Scrollbar Styles (for Webkit browsers like Chrome, Safari, Edge) */
+
+/* Overall scrollbar */
+::-webkit-scrollbar {
+  width: 10px; /* Width of the vertical scrollbar */
+  height: 10px; /* Height of the horizontal scrollbar */
+}
+
+/* Track (the background of the scrollbar) */
+::-webkit-scrollbar-track {
+  background: #111827; /* Darker gray, matching your app's background */
+  border-radius: 10px; /* Rounded corners for the track */
+}
+
+/* Handle (the draggable part of the scrollbar) */
+::-webkit-scrollbar-thumb {
+  background: #60a5fa; /* Your app's accent blue */
+  border-radius: 10px; /* Rounded corners for the thumb */
+  border: 2px solid #111827; /* Border to create a slight separation from the track */
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: #3b82f6; /* A slightly darker blue on hover */
+}
+
+/* Handle on active (when being dragged) */
+::-webkit-scrollbar-thumb:active {
+  background: #2563eb; /* Even darker blue when active */
+}
+
+/* For Firefox (less customizable, but good for basic styling) */
+/* This will make the scrollbar thinner and change its color */
+html {
+  scrollbar-width: thin; /* 'auto' or 'none' */
+  scrollbar-color: #60a5fa #111827; /* thumb color track color */
+}
+
+.overflow-y-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #60a5fa #111827;
+}
+.overflow-y-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.overflow-y-scroll::-webkit-scrollbar-thumb {
+  background: #60a5fa;
+  border: 2px solid #111827;
+}
+.overflow-y-scroll::-webkit-scrollbar-track {
+  background: #111827;
+}
