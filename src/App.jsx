@@ -1952,7 +1952,7 @@ const ImagePreviewModal = ({ imageUrl, onClose, imageLabel }) => {
 }
 
 // Statistics Page Component
-const StatisticsPage = ({ setCurrentPage }) => {
+const StatisticsPage = () => {
   const { db, userId, isAuthReady } = useContext(FirebaseContext)
   const [workoutStats, setWorkoutStats] = useState({}) // { year: { workoutDays, restDays } }
   const [measurements, setMeasurements] = useState([]) // Array of all measurements for display
@@ -2136,15 +2136,6 @@ const StatisticsPage = ({ setCurrentPage }) => {
           </div>
         )}
       </div>
-
-      <div className='mt-8 text-center'>
-        <button
-          onClick={() => setCurrentPage('calendar')}
-          className='px-6 py-3 bg-gray-600 text-gray-100 rounded-lg hover:bg-gray-700 transition-colors shadow-md'
-        >
-          ⬅️ Back to Calendar
-        </button>
-      </div>
     </div>
   )
 }
@@ -2261,7 +2252,7 @@ const MeasurementData = ({ m }) => {
   )
 }
 // Settings Page Component
-const SettingsPage = ({ setCurrentPage }) => {
+const SettingsPage = () => {
   const { db, auth, userId, isAuthReady } = useContext(FirebaseContext)
   const [calendarSettings, setCalendarSettings] = useState({
     workoutDaysOfWeek: [1, 2, 3, 4, 5], // Monday=1, Sunday=0
@@ -2427,8 +2418,9 @@ const SettingsPage = ({ setCurrentPage }) => {
           Calendar Preferences
         </h3>
         <div className='mb-4'>
-          <label className='block text-gray-300 font-semibold mb-2 '>
-            Workout Days:
+          <label className='flex flex-col text-gray-300 font-semibold mb-2 '>
+            <span>Workout Days:</span>
+            <span className='text-gray-400 italic text-xs sm:text-sm '>Unmarked Days are Recorded as Rest Days</span>
           </label>
           <div className='flex flex-wrap gap-1 sm:gap-2'>
             {daysOfWeek.map((day, index) => (
@@ -2440,48 +2432,27 @@ const SettingsPage = ({ setCurrentPage }) => {
                   type='checkbox'
                   checked={calendarSettings.workoutDaysOfWeek.includes(index)}
                   onChange={(e) => {
-                    const newDays = e.target.checked
+                    const newWorkDays = e.target.checked
                       ? [...calendarSettings.workoutDaysOfWeek, index]
                       : calendarSettings.workoutDaysOfWeek.filter(
                           (d) => d !== index
                         )
+                    const newRestDays = e.target.checked
+                      ? calendarSettings.restDaysOfWeek.filter(
+                          (d) => d !== index
+                        )
+                      : [...calendarSettings.restDaysOfWeek, index]
+                    console.log(
+                      'restDays : ' + newRestDays,
+                      'workdays : ' + newWorkDays
+                    )
                     setCalendarSettings((prev) => ({
                       ...prev,
-                      workoutDaysOfWeek: newDays,
+                      restDaysOfWeek: newRestDays,
+                      workoutDaysOfWeek: newWorkDays,
                     }))
                   }}
                   className='form-checkbox h-3 w-3 sm:h-5 sm:w-5 text-blue-500 rounded-md bg-gray-700 border-gray-500 checked:bg-blue-500'
-                />
-                <span>{day}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-        <div className='mb-6'>
-          <label className='block text-gray-300 font-semibold mb-2 '>
-            Rest Days:
-          </label>
-          <div className='flex flex-wrap gap-1 sm:gap-2'>
-            {daysOfWeek.map((day, index) => (
-              <label
-                key={`rest-${index}`}
-                className='flex items-center sm:space-x-2 space-x-1 bg-gray-600 rounded-md cursor-pointer hover:bg-gray-500 transition-colors py-1 px-2 sm:p-2'
-              >
-                <input
-                  type='checkbox'
-                  checked={calendarSettings.restDaysOfWeek.includes(index)}
-                  onChange={(e) => {
-                    const newDays = e.target.checked
-                      ? [...calendarSettings.restDaysOfWeek, index]
-                      : calendarSettings.restDaysOfWeek.filter(
-                          (d) => d !== index
-                        )
-                    setCalendarSettings((prev) => ({
-                      ...prev,
-                      restDaysOfWeek: newDays,
-                    }))
-                  }}
-                  className='form-checkbox text-red-500 rounded-md bg-gray-700 border-gray-500 checked:bg-red-500 h-3 w-3 sm:h-5 sm:w-5'
                 />
                 <span>{day}</span>
               </label>
@@ -2520,15 +2491,6 @@ const SettingsPage = ({ setCurrentPage }) => {
           className='w-full px-2 py-1 sm:px-4 sm:py-2 bg-red-800 text-white rounded-md hover:bg-red-900 transition-colors shadow-sm'
         >
           ⚠️ Clear All Account Data
-        </button>
-      </div>
-
-      <div className='mt-8 text-center'>
-        <button
-          onClick={() => setCurrentPage('calendar')}
-          className='px-6 py-3 bg-gray-600 text-gray-100 rounded-lg hover:bg-gray-700 transition-colors shadow-md'
-        >
-          ⬅️ Back to Calendar
         </button>
       </div>
 
