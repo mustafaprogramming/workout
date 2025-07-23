@@ -262,7 +262,7 @@ const App = () => {
             <span className='text-xs sm:text-sm text-blue-300 font-bold '>
               v
             </span>
-            .1.0.05
+            1.0.06
           </span>
         </header>
 
@@ -3294,6 +3294,9 @@ const FloatingTimer = ({
     if (dragging) {
       document.addEventListener('mousemove', MousePosition)
       document.addEventListener('touchmove', MousePosition, { passive: false })
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
     }
 
     return () => {
