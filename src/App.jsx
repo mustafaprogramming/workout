@@ -883,7 +883,7 @@ const CalendarPage = ({ setCurrentPage, setSelectedDate, userCreatedAt }) => {
         />
         <button
           onClick={handleSearchDate}
-          className='sm:px-4 px-2 py-1.5 sm:py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 text-sm sm:text-base'
+          className='sm:px-4 px-2 py-1.5 sm:py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 text-xs sm:text-sm md:text-base'
         >
           🔍 Go to Date
         </button>
@@ -3260,6 +3260,7 @@ const FloatingTimer = ({
   const timerRef = useRef(null)
   useEffect(() => {
     function MousePosition(e) {
+      e.preventDefault()
       function getEventCoords(e) {
         if (e.touches) {
           return { x: e.touches[0].clientX, y: e.touches[0].clientY }
