@@ -124,6 +124,40 @@ const App = () => {
       setIsAuthReady(true) // Allow AuthPage to show error
     }
   }, [])
+  //hard reset timers
+  function stopTimers() {
+    setShowMiniStopwatch(false)
+    setShowMiniCountdown(false)
+    setStopwatchTime(0)
+    setStopwatchIsRunning(false)
+    setCountdownTime(0)
+    setCountdownIsRunning(false)
+  }
+  // Stopwatch logic
+  useEffect(() => {
+    let interval
+    if (stopwatchIsRunning) {
+      interval = setInterval(() => {
+        setStopwatchTime((prevTime) => prevTime + 1000) // Update every second
+      }, 1000)
+    }
+    return () => clearInterval(interval)
+  }, [stopwatchIsRunning])
+
+  // Countdown timer logic
+  useEffect(() => {
+    let interval
+    if (countdownIsRunning && countdownTime > 0) {
+      interval = setInterval(() => {
+        setCountdownTime((prevTime) => prevTime - 1)
+      }, 1000)
+    } else if (countdownTime === 0 && countdownIsRunning) {
+      setCountdownIsRunning(false)
+      setShowMiniCountdown(false)
+      setShowAlarm(true)
+    }
+    return () => clearInterval(interval)
+  }, [countdownIsRunning, countdownTime])
 
   if (!isAuthReady) {
     return (
@@ -163,20 +197,21 @@ const App = () => {
       case 'measurements':
         return (
           <MeasurementsPage
-            setCurrentPage={setCurrentPage}
             setSelectedMonth={setSelectedMonth}
             selectedMonth={selectedMonth}
           />
         )
       case 'statistics':
-        return <StatisticsPage setCurrentPage={setCurrentPage} />
+        return <StatisticsPage />
       case 'settings':
-        return <SettingsPage setCurrentPage={setCurrentPage} />
+        return <SettingsPage stopTimers={stopTimers} />
       case 'workoutPlan':
         return (
           <WorkoutPlanPage
             setShowMiniStopwatch={setShowMiniStopwatch}
             setShowMiniCountdown={setShowMiniCountdown}
+            showMiniStopwatch={showMiniStopwatch}
+            showMiniCountdown={showMiniCountdown}
             stopwatchTime={stopwatchTime}
             setStopwatchTime={setStopwatchTime}
             stopwatchIsRunning={stopwatchIsRunning}
@@ -269,7 +304,6 @@ const App = () => {
             time={stopwatchTime}
             isRunning={stopwatchIsRunning}
             setIsRunning={setStopwatchIsRunning}
-            reset={setStopwatchTime}
             setShowMini={setShowMiniStopwatch}
           />
         )}
@@ -279,7 +313,6 @@ const App = () => {
             time={countdownTime}
             isRunning={countdownIsRunning}
             setIsRunning={setCountdownIsRunning}
-            reset={setCountdownTime}
             setShowMini={setShowMiniCountdown}
           />
         )}
@@ -317,7 +350,7 @@ function AlarmModal({ visible, onClose }) {
   if (!visible) return null
 
   return (
-    <div className='fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 animate-flash '>
+    <div className='fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[60] animate-flash '>
       <div className='bg-red-800 text-white p-6 rounded-lg shadow-lg text-center  relative sm:max-w-sm w-full animate-shake max-w-[85vw]'>
         <h2 className='text-3xl font-bold mb-4 '>⏰ TIME'S UP!</h2>
         <p className='mb-4 text-sm'>Your timer has finished.</p>
@@ -998,7 +1031,7 @@ const DayActionsModal = ({
                             className='bg-gray-800 border-b border-gray-700 last:border-b-0'
                           >
                             <td className=' py-1 px-4 ml-auto text-left  italic'>
-                              Set {exIndex + 1}:
+                              Set {setIndex + 1}:
                             </td>
                             <td className=' py-1 px-3 text-left'>-</td>
                             <td className=' py-1 px-3 text-left'>{set.reps}</td>
@@ -2165,7 +2198,7 @@ const MeasurementModal = ({ monthData, onClose, onSave, onClearData }) => {
 // Image Preview Modal
 const ImagePreviewModal = ({ imageUrl, onClose, imageLabel }) => {
   return (
-    <div className='fixed inset-0 bg-gray-900 bg-opacity-40 backdrop-blur-lg flex justify-center items-center sm:p-4 p-2 z-50 '>
+    <div className='fixed inset-0 bg-gray-900 bg-opacity-40 backdrop-blur-lg flex justify-center items-center sm:p-4 p-2 z-[60] '>
       <div className=' bg-gray-900 sm:p-4 p-2 rounded-xl relative max-w-[500px] max-h-[90vh] flex flex-col shadow-[5px_5px_0px_0px_#030712] border-2 border-gray-950 '>
         <div className='flex gap-1 justify-between'>
           {imageLabel && (
@@ -2550,7 +2583,7 @@ const MeasurementData = ({ m }) => {
   )
 }
 // Settings Page Component
-const SettingsPage = () => {
+const SettingsPage = ({ stopTimers }) => {
   const { db, auth, userId, isAuthReady } = useContext(FirebaseContext)
   const [calendarSettings, setCalendarSettings] = useState({
     workoutDaysOfWeek: [1, 2, 3, 4, 5], // Monday=1, Sunday=0
@@ -2621,6 +2654,7 @@ const SettingsPage = () => {
         setMessage('Signed out successfully!')
         setMessageType('success')
         setShowConfirmSignOutModal(false)
+        stopTimers()
         // The App component will handle resetting state due to onAuthStateChanged
       } catch (error) {
         console.error('Error signing out:', error)
@@ -2682,6 +2716,7 @@ const SettingsPage = () => {
       setMessage('All account data deleted successfully! Signing you out...')
       setMessageType('success')
       setShowConfirmDeleteAccountModal(false)
+      stopTimers()
       await signOut(auth) // Sign out after data deletion
     } catch (error) {
       console.error('Error deleting all account data:', error.message)
@@ -2878,7 +2913,7 @@ const SettingsPage = () => {
 // Generic Modal Component
 const Modal = ({ children, onClose }) => {
   return (
-    <div className='fixed inset-0 bg-gray-900 bg-opacity-20 backdrop-blur-lg flex  justify-center px-4 py-10 z-50  '>
+    <div className='fixed inset-0 bg-gray-900 bg-opacity-20 backdrop-blur-lg flex  justify-center px-4 py-10 z-[60]  '>
       <div className='bg-gray-900 p-3 sm:p-6 rounded-xl  max-w-lg w-full h-fit relative text-gray-100 shadow-[5px_5px_0px_0px_#030712] border border-gray-950  '>
         <button
           onClick={onClose}
@@ -2896,6 +2931,8 @@ const Modal = ({ children, onClose }) => {
 const WorkoutPlanPage = ({
   setShowMiniStopwatch,
   setShowMiniCountdown,
+  showMiniStopwatch,
+  showMiniCountdown,
   stopwatchTime,
   setStopwatchTime,
   stopwatchIsRunning,
@@ -2904,7 +2941,6 @@ const WorkoutPlanPage = ({
   setCountdownTime,
   countdownIsRunning,
   setCountdownIsRunning,
-  setShowAlarm,
 }) => {
   const { db, userId, isAuthReady } = useContext(FirebaseContext)
   const [workoutPlans, setWorkoutPlans] = useState({}) // { 'monday': { exercises: [] }, ... }
@@ -2934,17 +2970,6 @@ const WorkoutPlanPage = ({
       .padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`
   }
 
-  // Stopwatch logic
-  useEffect(() => {
-    let interval
-    if (stopwatchIsRunning) {
-      interval = setInterval(() => {
-        setStopwatchTime((prevTime) => prevTime + 1000) // Update every second
-      }, 1000)
-    }
-    return () => clearInterval(interval)
-  }, [stopwatchIsRunning])
-
   const startStopwatch = () => setStopwatchIsRunning(true)
   const pauseStopwatch = () => setStopwatchIsRunning(false)
   const resetStopwatch = () => {
@@ -2952,27 +2977,10 @@ const WorkoutPlanPage = ({
     setStopwatchIsRunning(false)
   }
 
-  // Countdown timer logic
-  useEffect(() => {
-    let interval
-    if (countdownIsRunning && countdownTime > 0) {
-      interval = setInterval(() => {
-        setCountdownTime((prevTime) => prevTime - 1)
-      }, 1000)
-    } else if (countdownTime === 0 && countdownIsRunning) {
-      setCountdownIsRunning(false)
-      setMessage('Countdown finished!')
-      setMessageType('success')
-      setShowAlarm(true)
-    }
-    return () => clearInterval(interval)
-  }, [countdownIsRunning, countdownTime])
-
   const startCountdown = () => {
     if (countdownTime === '' || countdownTime === null || countdownTime === 0)
       return
     setCountdownIsRunning(true)
-    setShowMiniCountdown(true)
   }
   const pauseCountdown = () => setCountdownIsRunning(false)
   const resetCountdown = () => {
@@ -3061,11 +3069,11 @@ const WorkoutPlanPage = ({
       )}
 
       {/* Timers Section */}
-      <div className='mb-8 bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-4 rounded-lg '>
+      <div className='mb-8 bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-2 sm:p-4 rounded-lg '>
         <h3 className='sm:text-xl md:text-2xl text-lg font-semibold text-gray-200 mb-3'>
           Timers
         </h3>
-        <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-4'>
           {/* Stopwatch */}
           <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-4 rounded-md  cursor-pointer hover:bg-gray-700 transition-colors'>
             <h4 className='text-lg font-semibold text-blue-300 mb-2'>
@@ -3074,14 +3082,13 @@ const WorkoutPlanPage = ({
             <div className='text-3xl font-bold mb-3'>
               {formatTime(stopwatchTime)}
             </div>
-            <div className='flex space-x-2'>
+            <div className='flex flex-wrap gap-2'>
               <button
                 onClick={(e) => {
                   e.stopPropagation()
-                  setShowMiniStopwatch(true)
                   stopwatchIsRunning ? pauseStopwatch() : startStopwatch()
                 }}
-                className={`px-3 py-1 rounded-md shadow-[3px_3px_0px_0px_#030712] border border-gray-950 ${
+                className={`px-1.5 py-0.5 sm:px-3 sm:py-1 rounded-md shadow-[3px_3px_0px_0px_#030712] border border-gray-950 ${
                   stopwatchIsRunning
                     ? 'bg-orange-600 hover:bg-orange-700'
                     : 'bg-green-600 hover:bg-green-700'
@@ -3095,9 +3102,18 @@ const WorkoutPlanPage = ({
                   setShowMiniStopwatch(false)
                   resetStopwatch()
                 }}
-                className='px-3 py-1 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors'
+                className='px-1.5 py-0.5 sm:px-3 sm:py-1 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors'
               >
                 Reset
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowMiniStopwatch(showMiniStopwatch ? false : true)
+                }}
+                className='px-1.5 py-0.5 sm:px-3 sm:py-1 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 bg-gray-600 text-white rounded-md hover:bg-gray-700 ml-auto transition-colors'
+              >
+                {showMiniStopwatch ? 'Hide' : 'Show'} Float
               </button>
             </div>
           </div>
@@ -3115,7 +3131,7 @@ const WorkoutPlanPage = ({
                 type='number'
                 placeholder='H'
                 min='0'
-                className='w-16 p-1 bg-gray-900 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md text-gray-100'
+                className='w-12 sm:w-16 sm:p-1 py-0.5 px-1 bg-gray-900 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md text-gray-100'
                 onChange={(e) =>
                   setCustomCountdown(
                     parseInt(e.target.value) || 0,
@@ -3129,7 +3145,7 @@ const WorkoutPlanPage = ({
                 placeholder='M'
                 min='0'
                 max='59'
-                className='w-16 p-1 bg-gray-900 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md text-gray-100'
+                className='w-12 sm:w-16 sm:p-1 py-0.5 px-1 bg-gray-900 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md text-gray-100'
                 onChange={(e) =>
                   setCustomCountdown(
                     Math.floor(countdownTime / 3600),
@@ -3143,7 +3159,7 @@ const WorkoutPlanPage = ({
                 placeholder='S'
                 min='0'
                 max='59'
-                className='w-16 p-1 bg-gray-900 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md text-gray-100'
+                className='w-12 sm:w-16 sm:p-1 py-0.5 px-1 bg-gray-900 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md text-gray-100'
                 onChange={(e) =>
                   setCustomCountdown(
                     Math.floor(countdownTime / 3600),
@@ -3153,13 +3169,13 @@ const WorkoutPlanPage = ({
                 }
               />
             </div>
-            <div className='flex space-x-2'>
+            <div className='flex flex-wrap gap-2'>
               <button
                 onClick={(e) => {
                   e.stopPropagation()
                   countdownIsRunning ? pauseCountdown() : startCountdown()
                 }}
-                className={`px-3 py-1 rounded-md shadow-[3px_3px_0px_0px_#030712] border border-gray-950 ${
+                className={`px-1.5 py-0.5 sm:px-3 sm:py-1  rounded-md shadow-[3px_3px_0px_0px_#030712] border border-gray-950 ${
                   countdownIsRunning
                     ? 'bg-orange-600 hover:bg-orange-700'
                     : 'bg-green-600 hover:bg-green-700'
@@ -3173,9 +3189,18 @@ const WorkoutPlanPage = ({
                   resetCountdown()
                   setShowMiniCountdown(false)
                 }}
-                className='px-3 py-1 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors'
+                className='px-1.5 py-0.5 sm:px-3 sm:py-1  shadow-[3px_3px_0px_0px_#030712] border border-gray-950 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors'
               >
                 Reset
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setShowMiniCountdown(showMiniCountdown ? false : true)
+                }}
+                className='px-1.5 py-0.5 sm:px-3 sm:py-1 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 bg-gray-600 text-white rounded-md hover:bg-gray-700 ml-auto transition-colors'
+              >
+                {showMiniCountdown ? 'Hide' : 'Show'} Float
               </button>
             </div>
           </div>
@@ -3206,7 +3231,6 @@ const WorkoutPlanPage = ({
 const FloatingTimer = ({
   type,
   time,
-  reset,
   isRunning,
   setIsRunning,
   setShowMini,
@@ -3236,42 +3260,53 @@ const FloatingTimer = ({
   const timerRef = useRef(null)
   useEffect(() => {
     function MousePosition(e) {
+      function getEventCoords(e) {
+        if (e.touches) {
+          return { x: e.touches[0].clientX, y: e.touches[0].clientY }
+        } else {
+          return { x: e.clientX, y: e.clientY }
+        }
+      }
       const Width = window.innerWidth
       const Height = window.innerHeight
       const { height, width } = timerRef.current.getBoundingClientRect()
-      let Top = `${e.y}px`
-      let Left = `${e.x}px`
-
-      if (e.y <= 25) {
-        Top = '25px'
+      const { x, y } = getEventCoords(e)
+      let Top = y
+      let Left = x
+      if (y <= 25) {
+        Top = 25
       }
-      if (e.y > Height - height / 2) {
-        Top = `${Height - height / 2}px`
+      if (y > Height - height / 2) {
+        Top = Height - height / 2
       }
-      if (e.x <= 25) {
-        Left = '25px'
+      if (x <= 25) {
+        Left = 25
       }
-      if (e.x > Width - (width - 10)) {
-        Left = `${Width - (width - 10)}px`
+      if (x > Width - (width - 18 + 10)) {
+        Left = Width - (width - 18 + 10)
       }
-      setPosition({ top: Top, left: Left })
+      setPosition({ top: `${Top}px`, left: `${Left}px` })
     }
     if (dragging) {
-      window.addEventListener('mousemove', MousePosition)
+      document.addEventListener('mousemove', MousePosition)
+      document.addEventListener('touchmove', MousePosition, { passive: false })
     }
 
     return () => {
-      window.removeEventListener('mousemove', MousePosition)
+      document.removeEventListener('mousemove', MousePosition)
+      document.removeEventListener('touchmove', MousePosition, {
+        passive: false,
+      })
     }
   }, [dragging])
   return (
     <div
       ref={timerRef}
-      className='fixed bg-gray-900 border border-blue-500 rounded-lg p-3 shadow-xl cursor-pointer z-50 flex items-center space-x-2 -translate-x-[21px] -translate-y-[25px] w-fit h-fit '
+      className='fixed bg-gray-900 border border-blue-500 rounded-lg p-3 shadow-xl cursor-pointer z-[50] flex items-center space-x-2 -translate-x-[18px] -translate-y-[25px] w-fit h-fit select-none '
       style={position}
     >
       <button
-        className='flex items-center justify-center cursor-move scale-125'
+        className='cursor-move scale-125'
         onMouseDown={() => {
           setDragging(true)
         }}
@@ -3285,20 +3320,7 @@ const FloatingTimer = ({
           setDragging(false)
         }}
       >
-        <svg
-          xmlns='http://www.w3.org/2000/svg'
-          width='16'
-          height='24'
-          viewBox='0 0 16 24'
-          className='fill-gray-300 pointer-events-auto'
-        >
-          {[0, 6, 12].map((y) => (
-            <g key={y}>
-              <rect x='3' y={y + 4} width='3' height='3' rx='0.5' />
-              <rect x='9' y={y + 4} width='3' height='3' rx='0.5' />
-            </g>
-          ))}
-        </svg>
+        ⁝⁝⁝
       </button>
       <span className='text-blue-400 text-sm font-bold'>
         {type === 'stopwatch' ? '⏱️' : '⏳'}
@@ -3313,14 +3335,12 @@ const FloatingTimer = ({
         {isRunning ? 'RUNNING' : 'PAUSED'}
       </button>
       <button
-        className='text-sm text-gray-100 flex items-center justify-center w-[15px] h-[15px] bg-red-800 rounded-full p-1 lg:pt-0.5'
+        className='text-sm'
         onClick={() => {
-          reset(0)
-          setIsRunning(false)
           setShowMini(false)
         }}
       >
-        &times;
+        ❌
       </button>
     </div>
   )
