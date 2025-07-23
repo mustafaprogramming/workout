@@ -238,7 +238,7 @@ const App = () => {
     <FirebaseContext.Provider value={{ db, auth, userId, isAuthReady }}>
       <div className='min-h-screen bg-gray-900  text-gray-100 font-inter'>
         <header className='bg-gray-800 p-4 flex justify-start items-center rounded-b-3xl sticky z-[50] top-0  mx-4 sm:shadow-[0_10px_0px_0px_#030712] shadow-[0_5px_0px_0px_#030712] border border-gray-950'>
-          <h1 className='text-3xl font-extrabold text-blue-400 justify-around items-center flex gap-3'>
+          <h1 className='text-2xl sm:text-3xl font-extrabold text-blue-400 justify-around items-center flex gap-3'>
             <svg
               width='32'
               height='32'
@@ -258,6 +258,12 @@ const App = () => {
             </svg>
             CoreTrack
           </h1>
+          <span className='text-xs sm:text-sm text-gray-300 ml-auto '>
+            <span className='text-xs sm:text-sm text-blue-300 font-bold '>
+              v
+            </span>
+            .1.0.05
+          </span>
         </header>
 
         {userId && ( // Only show navigation if logged in
@@ -3259,35 +3265,32 @@ const FloatingTimer = ({
   const [dragging, setDragging] = useState(false)
   const timerRef = useRef(null)
   useEffect(() => {
-    function MousePosition(e) {
-      e.preventDefault()
-      function getEventCoords(e) {
-        if (e.touches) {
-          return { x: e.touches[0].clientX, y: e.touches[0].clientY }
-        } else {
-          return { x: e.clientX, y: e.clientY }
-        }
+    function getEventCoords(e) {
+      if (e.touches) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY }
+      } else {
+        return { x: e.clientX, y: e.clientY }
       }
+    }
+
+    const MousePosition = (e) => {
+      e.preventDefault()
       const Width = window.innerWidth
       const Height = window.innerHeight
       const { height, width } = timerRef.current.getBoundingClientRect()
       const { x, y } = getEventCoords(e)
+
       let Top = y
       let Left = x
-      if (y <= 25) {
-        Top = 25
-      }
-      if (y > Height - height / 2) {
-        Top = Height - height / 2
-      }
-      if (x <= 25) {
-        Left = 25
-      }
-      if (x > Width - (width - 18 + 10)) {
-        Left = Width - (width - 18 + 10)
-      }
+
+      if (y <= 25) Top = 25
+      if (y > Height - height / 2) Top = Height - height / 2
+      if (x <= 25) Left = 25
+      if (x > Width - (width - 18 + 10)) Left = Width - (width - 18 + 10)
+
       setPosition({ top: `${Top}px`, left: `${Left}px` })
     }
+
     if (dragging) {
       document.addEventListener('mousemove', MousePosition)
       document.addEventListener('touchmove', MousePosition, { passive: false })
@@ -3295,11 +3298,20 @@ const FloatingTimer = ({
 
     return () => {
       document.removeEventListener('mousemove', MousePosition)
-      document.removeEventListener('touchmove', MousePosition, {
-        passive: false,
-      })
+      // ⚠ Fix: must use same passive setting when removing
+      document.removeEventListener('touchmove', MousePosition) // remove with same reference
     }
   }, [dragging])
+  // stop drag
+  useEffect(() => {
+    const stopDragging = () => setDragging(false)
+    document.addEventListener('mouseup', stopDragging)
+    document.addEventListener('touchend', stopDragging)
+    return () => {
+      document.removeEventListener('mouseup', stopDragging)
+      document.removeEventListener('touchend', stopDragging)
+    }
+  }, [])
   return (
     <div
       ref={timerRef}
@@ -3308,18 +3320,8 @@ const FloatingTimer = ({
     >
       <button
         className='cursor-move scale-125'
-        onMouseDown={() => {
-          setDragging(true)
-        }}
-        onMouseUp={() => {
-          setDragging(false)
-        }}
-        onTouchStart={() => {
-          setDragging(true)
-        }}
-        onTouchEnd={() => {
-          setDragging(false)
-        }}
+        onMouseDown={() => setDragging(true)}
+        onTouchStart={() => setDragging(true)}
       >
         ⁝⁝⁝
       </button>
