@@ -1,0 +1,48 @@
+import { useEffect, useRef } from 'react'
+
+export default function Modal({ children, onClose }) {
+  const modalRef = useRef(null)
+
+  // Close on ESC key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  // Prevent body scroll
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = originalOverflow
+    }
+  }, [])
+
+  return (
+    <div
+      role='dialog'
+      aria-modal='true'
+      className='fixed inset-0 bg-gray-900 bg-opacity-20 backdrop-blur-lg flex justify-center px-4 py-10 z-[60]'
+    >
+      <div
+        ref={modalRef}
+        tabIndex={-1}
+        className='bg-gray-900 p-3 sm:p-6 rounded-xl max-w-lg w-full h-fit relative text-gray-100 shadow-[5px_5px_0px_0px_#030712] border border-gray-950'
+      >
+        <button
+          onClick={onClose}
+          className='absolute top-3 right-3 text-gray-400 hover:text-gray-100 text-2xl font-bold'
+          aria-label='Close modal'
+        >
+          &times;
+        </button>
+        {children}
+      </div>
+    </div>
+  )
+}

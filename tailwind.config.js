@@ -3,6 +3,9 @@ export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      screens: {
+        xs: '515px', 
+      },
       animation: {
         shake: 'shake 0.5s infinite',
         flash: 'flash 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
@@ -15,7 +18,7 @@ export default {
         },
         flash: {
           '0%, 100%': { opacity: '1' },
-          '50%': { opacity: '0.4' },
+          '50%': { opacity: '0.6' },
         },
       },
     },
