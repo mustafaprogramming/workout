@@ -143,7 +143,7 @@ export default function MeasurementData({ m }) {
                 (img, idx) =>
                   img.url && (
                     <div
-                      key={idx}
+                      key={img.public_id || idx} 
                       className='bg-gray-950 p-2 rounded-lg w-fit cursor-pointer max-w-[110px] sm:max-w-[160px] md:max-w-[210px] border border-gray-800 hover:shadow-[0px_0px_0px_0px_#030712] shadow-[5px_5px_0px_0px_#030712] duration-500'
                       role='button'
                       tabIndex={0}

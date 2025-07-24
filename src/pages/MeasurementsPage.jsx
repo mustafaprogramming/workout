@@ -5,7 +5,7 @@ import { formatDate } from '../util/utils'
 import { doc, setDoc, onSnapshot, collection } from 'firebase/firestore'
 
 export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
-  const { db, userId, isAuthReady } = useFirebase()
+  const { db, userId, isAuthReady } = useFirebase() // Removed storage from context
   const [measurements, setMeasurements] = useState({}) // { 'YYYY-MM-01': { data } }
   const [showMeasurementModal, setShowMeasurementModal] = useState(false)
   const [currentMonthData, setCurrentMonthData] = useState(null) // Data for the month being viewed/edited
@@ -338,7 +338,7 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
                 setMessageType('error')
               })
           }}
-          onClearData={(dateKey) => {
+          onClearData={async (dateKey) => { // Made onClearData async
             let savedLocally = false
 
             // Start a timeout — if we don't hear back in 2 seconds, assume offline
@@ -349,7 +349,7 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
                 setMessageType('success')
               }
             }, 2000)
-            // Overwrite with empty object, ensuring imageUrls is an empty array
+
             setDoc(
               doc(
                 db,
