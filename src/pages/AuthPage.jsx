@@ -17,8 +17,6 @@ export default function AuthPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
-  const appId = 'workout-tracker-app-local'
-
   const handleAuthAction = async () => {
     setMessage('')
     setMessageType('')

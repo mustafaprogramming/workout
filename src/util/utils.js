@@ -24,3 +24,14 @@ export async function runWithTimeout(promise, timeoutMs = 2000) {
     clearTimeout(timeout)
   })
 }
+
+export const copyToClipboard = async (copyItem, setCopied) => {
+  if (!copyItem) return
+  try {
+    await navigator.clipboard.writeText(copyItem)
+    setCopied(copyItem)
+    setTimeout(() => setCopied(''), 2000)
+  } catch (err) {
+    console.error('Failed to copy: ', err)
+  }
+}

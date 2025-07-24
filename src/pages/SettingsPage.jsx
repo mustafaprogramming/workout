@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore'
 import { signOut } from 'firebase/auth'
 import { useTimer } from '../context/TimerContext'
+import { copyToClipboard } from '../util/utils' // Assuming this utility is available
 
 export default function SettingsPage() {
   const { db, auth, userId, isAuthReady } = useFirebase()
@@ -24,12 +25,28 @@ export default function SettingsPage() {
   const [messageType, setMessageType] = useState('') // 'success' or 'error'
   const [showConfirmSignOutModal, setShowConfirmSignOutModal] = useState(false)
   const [showConfirmDeleteAccountModal, setShowConfirmDeleteAccountModal] =
-    useState(false)
+    useState(false) // This will now handle deleting account + all data
+  const [showConfirmClearDataModal, setShowConfirmClearDataModal] =
+    useState(false) // New state for clearing data only
+  // State to hold the user's email
+  const [userEmail, setUserEmail] = useState('')
+  const [copied, setCopied] = useState('')
 
   // Use a fixed app ID for Firestore path as __app_id is not available locally
-  const appId = import.meta.env.VITE_FIREBASE_APP_ID||'workout-tracker-app-local' // Or any unique string for your local app
+  const appId =
+    import.meta.env.VITE_FIREBASE_APP_ID || 'workout-tracker-app-local' // Or any unique string for your local app
 
   useEffect(() => {
+    if (auth && auth.currentUser) {
+      setUserEmail(auth.currentUser.email)
+    } else {
+      setUserEmail('') // Clear email if user logs out
+    }
+  }, [auth, auth?.currentUser]) // Re-run when auth or currentUser changes
+
+  useEffect(() => {
+    // This useEffect now *only* listens for calendar settings.
+    // The initial creation of calendar settings for a new user is handled in App.jsx.
     if (!db || !userId || !isAuthReady) return
 
     const userSettingsDocRef = doc(
@@ -43,9 +60,14 @@ export default function SettingsPage() {
         if (docSnap.exists()) {
           setCalendarSettings(docSnap.data())
         } else {
-          // Set default settings if none exist
-          setDoc(userSettingsDocRef, calendarSettings, { merge: true }).catch(
-            (e) => console.error('Error setting default calendar settings:', e)
+          // If the document doesn't exist (e.g., after data clear or account deletion),
+          // reset local state to default. Do NOT attempt to create it here.
+          setCalendarSettings({
+            workoutDaysOfWeek: [1, 2, 3, 4, 5],
+            restDaysOfWeek: [0, 6],
+          })
+          console.warn(
+            `Calendar settings document not found for user ${userId}. Resetting local state to defaults.`
           )
         }
       },
@@ -57,7 +79,7 @@ export default function SettingsPage() {
     )
 
     return () => unsubscribeSettings()
-  }, [db, userId, isAuthReady, appId])
+  }, [db, userId, isAuthReady, appId]) // Removed `calendarSettings` from dependencies as it's not used for writing here
 
   const handleSaveSettings = async () => {
     if (!db || !userId) return
@@ -95,26 +117,99 @@ export default function SettingsPage() {
     }
   }
 
-  const handleDeleteAllAccountData = async () => {
+  // Function: Clears all user data in Firestore but keeps the Auth account
+  const handleClearData = async () => {
     if (!db || !userId || !auth) {
       setMessage('Error: Firebase not initialized or user not logged in.')
       setMessageType('error')
       return
     }
 
-    setMessage('Deleting account data...')
+    setMessage('Clearing all your data...')
     setMessageType('info')
 
     try {
+      stopTimers() // Stop timers before data manipulation
+
+      const batch = writeBatch(db)
+
+      // Define paths to all user-specific collections
+      const collectionsToClear = [
+        'calendarSettings',
+        'measurements',
+        'userProfile', // User profile data will be cleared, but Auth account remains
+        'workoutPlans',
+        'workouts',
+      ]
+
+      for (const collectionName of collectionsToClear) {
+        const collectionRef = collection(
+          db,
+          `artifacts/${appId}/users/${userId}/${collectionName}`
+        )
+        const q = query(collectionRef)
+        const snapshot = await getDocs(q)
+
+        if (snapshot.empty) {
+          console.log(
+            `Collection ${collectionName} for user ${userId} is empty, skipping batch delete.`
+          )
+        } else {
+          snapshot.forEach((docSnap) => {
+            console.log(
+              `Adding document ${docSnap.id} from ${collectionName} to batch for deletion.`
+            )
+            batch.delete(docSnap.ref)
+          })
+        }
+      }
+
+      // Commit the batch deletion
+      await batch.commit()
+
+      setMessage(
+        'All data cleared successfully! Signing you out for a fresh start...'
+      )
+      setMessageType('success')
+      setShowConfirmClearDataModal(false)
+      await signOut(auth) // Sign out after data deletion to force a fresh state
+    } catch (error) {
+      console.error('Error clearing all data:', error.message)
+      setMessage(
+        `Data Clearing Failed: ${
+          error.message === 'Firebase: Error (auth/requires-recent-login).'
+            ? 'Re-login required before clearing data'
+            : error.message
+        }`
+      )
+      setMessageType('error')
+      setShowConfirmClearDataModal(false)
+    }
+  }
+
+  // Function: Deletes the Firebase Auth account AND all associated Firestore data
+  const handleDeleteAccount = async () => {
+    if (!db || !userId || !auth) {
+      setMessage('Error: Firebase not initialized or user not logged in.')
+      setMessageType('error')
+      return
+    }
+
+    setMessage('Deleting account and all data...')
+    setMessageType('info')
+
+    try {
+      stopTimers() // Stop timers before data manipulation
+
       const batch = writeBatch(db)
 
       // Define paths to all user-specific collections
       const collectionsToDelete = [
-        'workouts',
-        'measurements',
         'calendarSettings',
+        'measurements',
         'userProfile',
-        'workoutPlans', // Add workoutPlans to collections to delete
+        'workoutPlans',
+        'workouts',
       ]
 
       for (const collectionName of collectionsToDelete) {
@@ -122,20 +217,27 @@ export default function SettingsPage() {
           db,
           `artifacts/${appId}/users/${userId}/${collectionName}`
         )
-        const q = query(collectionRef) // Query all documents in the subcollection
+        const q = query(collectionRef)
         const snapshot = await getDocs(q)
 
-        snapshot.forEach((docSnap) => {
-          batch.delete(docSnap.ref)
-        })
+        if (snapshot.empty) {
+          console.log(
+            `Collection ${collectionName} for user ${userId} is empty, skipping batch delete.`
+          )
+        } else {
+          snapshot.forEach((docSnap) => {
+            console.log(
+              `Adding document ${docSnap.id} from ${collectionName} to batch for deletion.`
+            )
+            batch.delete(docSnap.ref)
+          })
+        }
       }
 
       // Commit the batch deletion
       await batch.commit()
 
       // Delete the user's authentication record
-      // Note: Firebase security rules should allow this if the user is authenticated
-      // If you implement re-authentication, it should happen before this step.
       if (auth.currentUser && auth.currentUser.uid === userId) {
         await auth.currentUser.delete()
       } else {
@@ -144,17 +246,16 @@ export default function SettingsPage() {
         )
       }
 
-      setMessage('All account data deleted successfully! Signing you out...')
+      setMessage('Account and all data deleted successfully! Signing you out...')
       setMessageType('success')
       setShowConfirmDeleteAccountModal(false)
-      stopTimers()
-      await signOut(auth) // Sign out after data deletion
+      await signOut(auth) // Sign out after auth record deletion
     } catch (error) {
-      console.error('Error deleting all account data:', error.message)
+      console.error('Error deleting account and data:', error.message)
       setMessage(
         `Deletion Failed: ${
-          error.message == 'Firebase: Error (auth/requires-recent-login).'
-            ? 'Re-login required before deleting all data'
+          error.message === 'Firebase: Error (auth/requires-recent-login).'
+            ? 'Re-login required before deleting your account'
             : error.message
         }`
       )
@@ -162,18 +263,7 @@ export default function SettingsPage() {
       setShowConfirmDeleteAccountModal(false)
     }
   }
-  const [copied, setCopied] = useState(false)
 
-  const copyToClipboard = async () => {
-    if (!userId) return
-    try {
-      await navigator.clipboard.writeText(userId)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      console.error('Failed to copy: ', err)
-    }
-  }
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
   return (
@@ -259,31 +349,62 @@ export default function SettingsPage() {
           Save Calendar Settings
         </button>
       </fieldset>
-      <div className='bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-4 rounded-lg space-x-4 mb-8'>
+
+      <div className='bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-4 rounded-lg flex flex-col gap-2 mb-8'>
+        <h3 className='sm:text-xl text-lg font-semibold text-gray-200 mb-3'>
+          Account Details
+        </h3>
+        {/* user id */}
         {userId && (
-          <div className='text-sm flex flex-wrap items-center gap-2 text-gray-400'>
+          <div className='text-sm flex flex-col xs:flex-row  xs:items-center gap-1 text-gray-400'>
             <span>User ID:</span>
-            <span
-              className='font-mono text-blue-300 break-all'
+            <div
+              className='font-mono text-blue-300 break-all flex items-center flex-1'
               aria-live='polite'
               aria-atomic='true'
             >
-              {userId}
-            </span>
-            <button
-              onClick={copyToClipboard}
-              className='text-xs px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-700 ml-auto border border-gray-950 shadow-[3px_3px_0px_0px_#030712] transition'
-              aria-label={
-                copied
-                  ? 'User ID copied to clipboard'
-                  : 'Copy user ID to clipboard'
-              }
+              <span>{userId}</span>
+              <button
+                onClick={() => copyToClipboard(userId, setCopied)}
+                className='text-xs px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-700 ml-auto border border-gray-950 shadow-[3px_3px_0px_0px_#030712] transition'
+                aria-label={
+                  copied === userId
+                    ? 'User ID copied to clipboard'
+                    : 'Copy user ID to clipboard'
+                }
+              >
+                {copied === userId ? '✨' : '📋'}
+              </button>
+            </div>
+          </div>
+        )}
+        {/* user email */}
+        {userEmail && (
+          <div className='text-sm flex flex-col xs:flex-row  xs:items-center gap-1 text-gray-400'>
+            <span>Email:</span>
+            <div
+              className='font-mono text-blue-300 break-all flex items-center flex-1'
+              aria-live='polite'
+              aria-atomic='true'
             >
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
+              <span>{userEmail}</span>
+              <button
+                onClick={() => copyToClipboard(userEmail, setCopied)}
+                className='text-xs px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-700 ml-auto border border-gray-950 shadow-[3px_3px_0px_0px_#030712] transition'
+                aria-label={
+                  copied === userEmail
+                    ? 'User Email copied to clipboard'
+                    : 'Copy user Email to clipboard'
+                }
+              >
+                {copied === userEmail ? '✨' : '📋'}
+              </button>
+            </div>
           </div>
         )}
       </div>
+
+      {/* account actions */}
       <div className='bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-2 sm:p-4 rounded-lg  space-y-4'>
         <h3 className='sm:text-xl text-lg font-semibold text-gray-200 mb-3'>
           Account Actions
@@ -296,11 +417,18 @@ export default function SettingsPage() {
           Sign Out
         </button>
         <button
-          onClick={() => setShowConfirmDeleteAccountModal(true)}
-          className='w-full px-2 py-1 sm:px-4 sm:py-2 bg-red-800 text-white rounded-md hover:bg-red-900 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
-          aria-label='Permanently clear all account data'
+          onClick={() => setShowConfirmClearDataModal(true)} // This button now clears data only
+          className='w-full px-2 py-1 sm:px-4 sm:py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
+          aria-label='Clear all your workout data'
         >
-          ⚠️ Clear All Account Data
+          🧹 Clear Data
+        </button>
+        <button
+          onClick={() => setShowConfirmDeleteAccountModal(true)} // This button now deletes account + all data
+          className='w-full px-2 py-1 sm:px-4 sm:py-2 bg-red-800 text-white rounded-md hover:bg-red-900 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
+          aria-label='Permanently delete your account and all associated data'
+        >
+          🗑️ Delete Account
         </button>
       </div>
 
@@ -337,7 +465,47 @@ export default function SettingsPage() {
         </Modal>
       )}
 
-      {showConfirmDeleteAccountModal && (
+      {showConfirmClearDataModal && ( // Modal for clearing data only
+        <Modal
+          onClose={() => setShowConfirmClearDataModal(false)}
+          aria-labelledby='clear-data-modal-title'
+        >
+          <h3
+            id='clear-data-modal-title'
+            className='text-xl font-bold text-orange-400 mb-4 mr-[34px]'
+          >
+            Confirm Clear All Data
+          </h3>
+          <p className='text-gray-200 mb-6'>
+            <span className='font-bold text-orange-300'>WARNING:</span> This
+            action will permanently delete ALL your workout logs, measurements,
+            and settings from the database. Your **user account will remain**,
+            and you will be signed out. You can sign back in to a brand new,
+            empty account. This cannot be undone.
+            <br />
+            <br />
+            Are you absolutely sure you want to proceed?
+          </p>
+          <div className='flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3'>
+            <button
+              onClick={() => setShowConfirmClearDataModal(false)}
+              className='px-2 py-1 sm:px-4 sm:py-2 bg-gray-900 text-white rounded-md hover:bg-gray-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
+              aria-label='Cancel data clearing'
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleClearData}
+              className='px-2 py-1 sm:px-4 sm:py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 transition-colors'
+              aria-label='Confirm and clear all my data'
+            >
+              Clear All My Data
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showConfirmDeleteAccountModal && ( // Modal for deleting account + all data
         <Modal
           onClose={() => setShowConfirmDeleteAccountModal(false)}
           aria-labelledby='delete-account-modal-title'
@@ -349,9 +517,9 @@ export default function SettingsPage() {
             Confirm Account Deletion
           </h3>
           <p className='text-gray-200 mb-6'>
-            <span className='font-bold text-red-300'>WARNING:</span> This action
-            will permanently delete ALL your workout logs, measurements, and
-            settings. This cannot be undone.
+            <span className='font-bold text-red-300'>FINAL WARNING:</span> This
+            action will permanently delete your **user account AND ALL** your
+            workout logs, measurements, and settings. This cannot be undone.
             <br />
             <br />
             Are you absolutely sure you want to proceed?
@@ -365,11 +533,11 @@ export default function SettingsPage() {
               Cancel
             </button>
             <button
-              onClick={handleDeleteAllAccountData}
+              onClick={handleDeleteAccount}
               className='px-2 py-1 sm:px-4 sm:py-2 bg-red-800 text-white rounded-md hover:bg-red-900 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 transition-colors'
-              aria-label='Confirm and delete all my data'
+              aria-label='Confirm and delete my account and all data'
             >
-              Delete All My Data
+              Delete My Account
             </button>
           </div>
         </Modal>

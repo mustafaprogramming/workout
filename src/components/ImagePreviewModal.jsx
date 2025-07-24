@@ -1,8 +1,10 @@
-import { useState } from "react"
+import { useState } from 'react'
+import { copyToClipboard } from '../util/utils'
 
 // Image Preview Modal
 export default function ImagePreviewModal({ imageUrl, onClose, imageLabel }) {
-  const [closing,setClosing]=useState(false)
+  const [closing, setClosing] = useState(false)
+  const [copied, setCopied] = useState('')
   return (
     <div
       className='fixed inset-0 bg-gray-900 bg-opacity-20 backdrop-blur-lg flex justify-center items-center px-4 py-10 z-[60]'
@@ -11,7 +13,11 @@ export default function ImagePreviewModal({ imageUrl, onClose, imageLabel }) {
       aria-labelledby='preview-image-title'
       aria-describedby='preview-image-description'
     >
-      <div className={`bg-gray-950 sm:p-4 py-2 rounded-xl relative max-w-[500px] max-h-[90vh] flex flex-col shadow-[5px_5px_0px_0px_#030712] border ${closing?'border-red-800':'border-gray-800'}`}>
+      <div
+        className={`bg-gray-950 sm:p-4 py-2 rounded-xl relative max-w-[500px] max-h-[90vh] flex flex-col shadow-[5px_5px_0px_0px_#030712] border ${
+          closing ? 'border-red-800' : 'border-gray-800'
+        }`}
+      >
         <div className='flex gap-1 justify-between'>
           {imageLabel && (
             <p
@@ -23,9 +29,15 @@ export default function ImagePreviewModal({ imageUrl, onClose, imageLabel }) {
           )}
           <button
             onClick={onClose}
-            onMouseEnter={()=>setClosing(true)}
-            onMouseLeave={()=>setClosing(false)}
-            className='absolute top-0 right-0 text-gray-400 hover:text-gray-100 text-sm z-10 px-3 py-1 bg-gray-800  hover:bg-red-800 flex items-center justify-center rounded-bl-xl rounded-tr-md'
+            onMouseEnter={() => setClosing(true)}
+            onMouseLeave={() => setClosing(false)}
+            onTouchStart={() => setClosing(true)}
+            onTouchEnd={() => setClosing(false)}
+            className={`absolute top-0 right-0 text-gray-400 hover:text-gray-100 text-sm z-10 px-3 py-1 flex items-center justify-center rounded-bl-xl rounded-tr-md ${
+              closing
+                ? 'border-red-800 bg-red-800'
+                : 'border-gray-800 bg-gray-800'
+            }`}
             aria-label='Close image preview'
           >
             close
@@ -44,12 +56,23 @@ export default function ImagePreviewModal({ imageUrl, onClose, imageLabel }) {
           />
         </div>
         {imageUrl && (
-          <p
+          <div
             id='preview-image-description'
-            className='text-xs text-gray-400  py-1 px-3  mb-1 mt-3 break-all text-wrap'
+            className='text-xs text-gray-400  py-1 px-3  mb-1 mt-3 flex items-center flex-1 '
           >
-            {imageUrl}
-          </p>
+            <span className='truncate mr-2'>{imageUrl}</span>
+            <button
+              onClick={() => copyToClipboard(imageUrl,setCopied)}
+              className='text-xs px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-700 ml-auto border border-gray-950 shadow-[3px_3px_0px_0px_#030712] transition'
+              aria-label={
+                copied == imageUrl
+                  ? 'User ID copied to clipboard'
+                  : 'Copy user ID to clipboard'
+              }
+            >
+              {copied == imageUrl ? '✨' : '📋'}
+            </button>
+          </div>
         )}
       </div>
     </div>
