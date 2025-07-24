@@ -15,7 +15,6 @@ export const FirebaseProvider = ({ children }) => {
   const [userCreatedAt, setUserCreatedAt] = useState(null)
 
   useEffect(() => {
-    console.log('run effect')
     if (!auth || !db) {
       setIsAuthReady(true)
       console.error(
@@ -25,10 +24,8 @@ export const FirebaseProvider = ({ children }) => {
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log('run unsubscribe')
 
       if (user) {
-        console.log('user  exists')
         // IMPORTANT: Only proceed if the user is NOT anonymous.
         // Anonymous users might be implicitly signed in by Firebase after a console deletion.
         if (!user.isAnonymous) {
@@ -80,7 +77,6 @@ export const FirebaseProvider = ({ children }) => {
           )
         }
       } else {
-        console.log('user does not exists')
         // User is truly logged out (no user object, not even anonymous)
         setUserId(null)
         setUserCreatedAt(null)

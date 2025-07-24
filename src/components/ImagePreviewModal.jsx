@@ -14,7 +14,7 @@ export default function ImagePreviewModal({ imageUrl, onClose, imageLabel }) {
       aria-describedby='preview-image-description'
     >
       <div
-        className={`bg-gray-950 sm:p-4 py-2 rounded-xl relative max-w-[500px] max-h-[90vh] flex flex-col shadow-[5px_5px_0px_0px_#030712] border ${
+        className={`bg-gray-950 sm:p-4 py-2 rounded-xl relative max-w-[95vw] sm:max-w-[500px] max-h-[90vh] flex flex-col shadow-[5px_5px_0px_0px_#030712] border ${
           closing ? 'border-red-800' : 'border-gray-800'
         }`}
       >

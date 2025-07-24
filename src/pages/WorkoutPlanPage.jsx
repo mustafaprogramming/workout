@@ -215,7 +215,7 @@ export default function WorkoutPlanPage() {
                   e.stopPropagation()
                   setShowMiniStopwatch(showMiniStopwatch ? false : true)
                 }}
-                className={`${stopwatchTime==0&&'hidden'} px-1.5 py-0.5 sm:px-3 sm:py-1 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 bg-gray-600 text-white rounded-md hover:bg-gray-700 ml-auto transition-colors`}
+                className={`${stopwatchTime==0&&'hidden'} px-1.5 py-0.5 sm:px-3 sm:py-1 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 bg-gray-900 text-white rounded-md hover:bg-gray-800 ml-auto transition-colors`}
                 aria-label={
                   showMiniStopwatch
                     ? 'Hide floating stopwatch'
@@ -332,7 +332,7 @@ export default function WorkoutPlanPage() {
                   e.stopPropagation()
                   setShowMiniCountdown(showMiniCountdown ? false : true)
                 }}
-                className={`${countdownTime==0&&'hidden'} px-1.5 py-0.5 sm:px-3 sm:py-1 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 bg-gray-600 text-white rounded-md hover:bg-gray-700 ml-auto transition-colors`}
+                className={`${countdownTime==0&&'hidden'} px-1.5 py-0.5 sm:px-3 sm:py-1 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 bg-gray-900 text-white rounded-md hover:bg-gray-800 ml-auto transition-colors`}
                 aria-label={
                   showMiniCountdown
                     ? 'Hide floating countdown timer'
