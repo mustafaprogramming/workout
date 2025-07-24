@@ -43,7 +43,7 @@ export default function ImagePreviewModal({ imageUrl, onClose, imageLabel }) {
             close
           </button>
         </div>
-        <div className='flex justify-center items-center overflow-hidden bg-gray-900'>
+        <div className='flex justify-center items-center overflow-hidden bg-gray-900 mx-2 rounded-sm'>
           <img
             src={imageUrl}
             alt={imageLabel || 'Full size preview'}
