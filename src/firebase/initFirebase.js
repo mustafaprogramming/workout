@@ -1,6 +1,8 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore'
+// --- UPDATED: Only import 'getFirestore' and 'initializeFirestore' ---
+import { getFirestore, initializeFirestore } from 'firebase/firestore'
+// --- END UPDATED ---
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -20,18 +22,37 @@ if (!firebaseConfig.apiKey) {
 } else {
   app = initializeApp(firebaseConfig)
   auth = getAuth(app)
-  db = getFirestore(app)
 
-  // ✅ Call persistence immediately after db init
-  enableIndexedDbPersistence(db).catch((err) => {
+  // --- UPDATED: Use initializeFirestore with 'indexeddb' string literal for cache kind ---
+  try {
+    db = initializeFirestore(app, {
+      cache: {
+        kind: 'indexeddb',
+        synchronizeTabs: true,
+      },
+    })
+    console.log(
+      '[Firestore] Offline persistence enabled using FirestoreSettings.cache.'
+    )
+  } catch (err) {
     if (err.code === 'failed-precondition') {
       console.warn(
-        '[Firestore] Offline persistence failed — multiple tabs open.'
+        '[Firestore] Offline persistence failed — multiple tabs open. Using in-memory cache.'
       )
+      // Fallback to in-memory cache if persistence fails (e.g., multiple tabs open)
+      db = getFirestore(app) // Initialize without persistence
     } else if (err.code === 'unimplemented') {
-      console.warn('[Firestore] Persistence not supported in this browser.')
+      console.warn(
+        '[Firestore] Persistence not supported in this browser. Using in-memory cache.'
+      )
+      // Fallback to in-memory cache if not supported
+      db = getFirestore(app) // Initialize without persistence
+    } else {
+      console.error('[Firestore] Error initializing persistence:', err)
+      db = getFirestore(app) // Fallback to in-memory cache on other errors
     }
-  })
+  }
+  // --- END UPDATED ---
 }
 
 export { app, auth, db }

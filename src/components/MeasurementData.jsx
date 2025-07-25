@@ -135,41 +135,51 @@ export default function MeasurementData({ m }) {
         )}
 
         {/* Image Thumbnails */}
-        {m.imageUrls && m.imageUrls.length > 0 && m.imageUrls.find((img) => img.url !== '') && (
-          <div className='py-3 px-6'>
-            <h4 className='font-semibold text-gray-200 mb-4'>Physique Images:</h4>
-            <div className='flex overflow-x-auto sm:gap-4 gap-2 pb-3'>
-              {m.imageUrls.map(
-                (img, idx) =>
-                  img.url && (
-                    <div
-                      key={img.public_id || idx} 
-                      className='bg-gray-950 p-2 rounded-lg w-fit cursor-pointer max-w-[110px] sm:max-w-[160px] md:max-w-[210px] border border-gray-800 hover:shadow-[0px_0px_0px_0px_#030712] shadow-[5px_5px_0px_0px_#030712] duration-500'
-                      role='button'
-                      tabIndex={0}
-                      onClick={() => handleImageClick(img.url, img.label)}
-                      onKeyDown={(e) => handleKeyPress(e, img.url, img.label)}
-                      aria-label={`Open preview for image ${img.label || idx + 1}`}
-                    >
-                      {img.label && (
-                        <p className='text-xs text-gray-400 mb-1 truncate'>{img.label}</p>
-                      )}
-                      <img
-                        src={img.url}
-                        alt={img.label || `Physique image ${idx + 1}`}
-                        className='w-full object-cover rounded-sm mb-2 max-w-[100px] max-h-[100px] sm:max-w-[150px] sm:max-h-[150px] md:max-w-[200px] md:max-h-[200px] overflow-hidden bg-center mx-auto'
-                        onError={(e) => {
-                          e.target.onerror = null
-                          e.target.src = 'https://placehold.co/300x200/4a5568/a0aec0?text=Image+Load+Error'
-                        }}
-                      />
-                      <p className='text-xs text-gray-500 truncate'>{img.url}</p>
-                    </div>
-                  )
-              )}
+        {m.imageUrls &&
+          m.imageUrls.length > 0 &&
+          m.imageUrls.find((img) => img.url !== '') && (
+            <div className='py-3 px-6'>
+              <h4 className='font-semibold text-gray-200 mb-4'>
+                Physique Images:
+              </h4>
+              <div className='flex overflow-x-auto sm:gap-4 gap-2 pb-3'>
+                {m.imageUrls.map(
+                  (img, idx) =>
+                    img.url && (
+                      <div
+                        key={img.public_id || idx}
+                        className='w-[120px] sm:w-[140px] md:w-[180px] 
+                        flex-shrink-0  select-none  
+                    relative bg-gray-900 p-2 rounded-lg cursor-pointer border border-gray-700 hover:shadow-[0px_0px_0px_0px_#030712] shadow-[5px_5px_0px_0px_#030712] duration-500 overflow-hidden group'
+                        role='button'
+                        tabIndex={0}
+                        onClick={() => handleImageClick(img.url, img.label)}
+                        onKeyDown={(e) => handleKeyPress(e, img.url, img.label)}
+                        aria-label={`Open preview for image ${
+                          img.label || idx + 1
+                        }`}
+                      >
+                        <img
+                          src={img.url}
+                          alt={img.label || `Physique image ${idx + 1}`}
+                          className='w-full h-[120px] sm:h-[140px] md:h-[180px] object-cover rounded-md mb-2 transition-transform duration-300 group-hover:scale-105'
+                          onError={(e) => {
+                            e.target.onerror = null
+                            e.target.src =
+                              'https://placehold.co/300x200/4a5568/a0aec0?text=Image+Load+Error'
+                          }}
+                        />
+                        {img.label && (
+                          <p className='text-xs  text-gray-400  p-0.5  truncate'>
+                            {img.label}
+                          </p>
+                        )}
+                      </div>
+                    )
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
       </div>
     </div>
   )

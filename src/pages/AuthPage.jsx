@@ -4,6 +4,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
 } from 'firebase/auth'
+import { useMessage } from '../context/MessageContext'
 
 export default function AuthPage() {
   const { auth } = useFirebase()
@@ -12,8 +13,7 @@ export default function AuthPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isRegistering, setIsRegistering] = useState(true)
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
-  const [messageType, setMessageType] = useState('')
+  const {  setMessage, setMessageType  } = useMessage()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
@@ -24,7 +24,9 @@ export default function AuthPage() {
 
     try {
       if (!auth) {
-        throw new Error('Firebase Auth is not initialized. Check your .env config.')
+        throw new Error(
+          'Firebase Auth is not initialized. Check your .env config.'
+        )
       }
 
       const trimmedEmail = email.trim()
@@ -36,7 +38,11 @@ export default function AuthPage() {
           throw new Error('Passwords do not match.')
         }
 
-        await createUserWithEmailAndPassword(auth, trimmedEmail, trimmedPassword)
+        await createUserWithEmailAndPassword(
+          auth,
+          trimmedEmail,
+          trimmedPassword
+        )
         setMessage('Registration successful! You are now logged in.')
         setMessageType('success')
       } else {
@@ -50,7 +56,9 @@ export default function AuthPage() {
 
       switch (error?.code) {
         case 'auth/email-already-in-use':
-          setMessage('Email already in use. Try logging in or use a different email.')
+          setMessage(
+            'Email already in use. Try logging in or use a different email.'
+          )
           break
         case 'auth/invalid-email':
           setMessage('Invalid email address format.')
@@ -66,7 +74,9 @@ export default function AuthPage() {
           setMessage('Network error. Please check your internet connection.')
           break
         default:
-          setMessage(error?.message || 'An unexpected authentication error occurred.')
+          setMessage(
+            error?.message || 'An unexpected authentication error occurred.'
+          )
           break
       }
     } finally {
@@ -84,25 +94,15 @@ export default function AuthPage() {
           {isRegistering ? 'Register' : 'Login'}
         </h2>
 
-        {message && (
-          <div
-            className={`p-3 mb-4 rounded-md text-center ${
-              messageType === 'success'
-                ? 'bg-green-800 text-green-200'
-                : 'bg-red-800 text-red-200'
-            }`}
-          >
-            {message}
-          </div>
-        )}
+        
 
         <div className='space-y-4 mb-6'>
           <input
             type='email'
             placeholder='Email'
-            autoComplete="email"
-            aria-required="true"
-            aria-label="Email address"
+            autoComplete='email'
+            aria-required='true'
+            aria-label='Email address'
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className='p-1.5 sm:p-3 w-full  bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950  rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
@@ -112,9 +112,9 @@ export default function AuthPage() {
             <input
               type={showPassword ? 'text' : 'password'}
               placeholder='Password'
-              aria-required="true"
-              aria-label="Password"
-              autoComplete="password"
+              aria-required='true'
+              aria-label='Password'
+              autoComplete='password'
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className='p-1.5 sm:p-3 w-full  bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950  rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 pr-10'
@@ -122,7 +122,7 @@ export default function AuthPage() {
             />
             <button
               type='button'
-              aria-label="Toggle password visibility"
+              aria-label='Toggle password visibility'
               onClick={() => setShowPassword(!showPassword)}
               className='absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-gray-400 hover:text-gray-200'
             >
@@ -134,17 +134,17 @@ export default function AuthPage() {
               <input
                 type={showConfirmPassword ? 'text' : 'password'}
                 placeholder='Confirm Password'
-                aria-required="true"
+                aria-required='true'
                 value={confirmPassword}
-                aria-label="Confirm password"
-                autoComplete="password"
+                aria-label='Confirm password'
+                autoComplete='password'
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className='p-1.5 sm:p-3 w-full bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 pr-10'
                 disabled={loading}
               />
               <button
                 type='button'
-                aria-label="Toggle confirm password visibility"
+                aria-label='Toggle confirm password visibility'
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 className='absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-gray-400 hover:text-gray-200'
               >
@@ -169,7 +169,9 @@ export default function AuthPage() {
             : "Don't have an account? "}
           <button
             onClick={() => setIsRegistering(!isRegistering)}
-            aria-label={isRegistering ? 'Switch to login' : 'Switch to register'}
+            aria-label={
+              isRegistering ? 'Switch to login' : 'Switch to register'
+            }
             className='text-blue-400 hover:underline font-medium'
             disabled={loading}
           >

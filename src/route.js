@@ -5,4 +5,5 @@ export const ROUTES = {
   statistics: 'statistics',
   settings: 'settings',
   workoutPlan: 'workoutPlan',
+  galleryPage: 'galleryPage'
 }

@@ -10,65 +10,117 @@ import {
   query,
   getDocs,
 } from 'firebase/firestore'
-import { signOut } from 'firebase/auth'
+import {
+  signOut,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+} from 'firebase/auth'
 import { useTimer } from '../context/TimerContext'
-import { copyToClipboard } from '../util/utils' // Assuming this utility is available
+import { copyToClipboard } from '../util/utils'
+import { deleteCloudinaryImage } from '../util/cloudinaryUtils'
+import { useMessage } from '../context/MessageContext'
 
 export default function SettingsPage() {
   const { db, auth, userId, isAuthReady } = useFirebase()
   const { stopTimers } = useTimer()
+  const { setMessage, setMessageType } = useMessage()
+
   const [calendarSettings, setCalendarSettings] = useState({
     workoutDaysOfWeek: [1, 2, 3, 4, 5], // Monday=1, Sunday=0
     restDaysOfWeek: [0, 6], // Sunday=0, Saturday=6
+    popUpTime: 5000, // Default for local state
+    lockProtectionEnabled: false, // Default to false
   })
-  const [message, setMessage] = useState('')
-  const [messageType, setMessageType] = useState('') // 'success' or 'error'
+
   const [showConfirmSignOutModal, setShowConfirmSignOutModal] = useState(false)
   const [showConfirmDeleteAccountModal, setShowConfirmDeleteAccountModal] =
-    useState(false) // This will now handle deleting account + all data
+    useState(false)
   const [showConfirmClearDataModal, setShowConfirmClearDataModal] =
-    useState(false) // New state for clearing data only
-  // State to hold the user's email
+    useState(false)
   const [userEmail, setUserEmail] = useState('')
   const [copied, setCopied] = useState('')
+  const [editSettings, setEditSettings] = useState(false)
+  const [deletionSpinner, setDeletionSpinner] = useState(false)
+  const [clearSpinner, setClearSpinner] = useState(false)
 
-  // Use a fixed app ID for Firestore path as __app_id is not available locally
+  const [showReauthModal, setShowReauthModal] = useState(false)
+  const [reauthPassword, setReauthPassword] = useState('')
+  const [reauthError, setReauthError] = useState('')
+
   const appId =
-    import.meta.env.VITE_FIREBASE_APP_ID || 'workout-tracker-app-local' // Or any unique string for your local app
+    import.meta.env.VITE_FIREBASE_APP_ID || 'workout-tracker-app-local'
 
   useEffect(() => {
     if (auth && auth.currentUser) {
       setUserEmail(auth.currentUser.email)
     } else {
-      setUserEmail('') // Clear email if user logs out
+      setUserEmail('')
     }
-  }, [auth, auth?.currentUser]) // Re-run when auth or currentUser changes
+  }, [auth, auth?.currentUser])
 
   useEffect(() => {
-    // This useEffect now *only* listens for calendar settings.
-    // The initial creation of calendar settings for a new user is handled in App.jsx.
-    if (!db || !userId || !isAuthReady) return
+    if (!db || !userId || !isAuthReady || !auth?.currentUser) {
+      return
+    }
 
     const userSettingsDocRef = doc(
       db,
       `artifacts/${appId}/users/${userId}/calendarSettings`,
       'settings'
     )
+
     const unsubscribeSettings = onSnapshot(
       userSettingsDocRef,
       (docSnap) => {
+        // --- CRITICAL FIX: Check auth.currentUser here to prevent updates for deleted users ---
+        // This is the primary guard for the SettingsPage's own listener.
+        if (!auth.currentUser || auth.currentUser.uid !== userId) {
+          console.log(
+            'SettingsPage Snapshot: User changed or deleted. Skipping state update/creation.'
+          )
+          return
+        }
+        // --- END CRITICAL FIX ---
+
         if (docSnap.exists()) {
-          setCalendarSettings(docSnap.data())
-        } else {
-          // If the document doesn't exist (e.g., after data clear or account deletion),
-          // reset local state to default. Do NOT attempt to create it here.
+          const fetchedSettings = docSnap.data()
           setCalendarSettings({
+            workoutDaysOfWeek: fetchedSettings.workoutDaysOfWeek || [
+              1, 2, 3, 4, 5,
+            ],
+            restDaysOfWeek: fetchedSettings.restDaysOfWeek || [0, 6],
+            popUpTime:
+              typeof fetchedSettings.popUpTime === 'number'
+                ? fetchedSettings.popUpTime
+                : 5000,
+            lockProtectionEnabled:
+              typeof fetchedSettings.lockProtectionEnabled === 'boolean'
+                ? fetchedSettings.lockProtectionEnabled
+                : false,
+          })
+        } else {
+          // If settings document doesn't exist, create it with defaults here.
+          // This ensures it's created for new, authenticated users, or re-created if deleted.
+          const defaultCalendarSettings = {
             workoutDaysOfWeek: [1, 2, 3, 4, 5],
             restDaysOfWeek: [0, 6],
-          })
-          console.warn(
-            `Calendar settings document not found for user ${userId}. Resetting local state to defaults.`
+            popUpTime: 5000,
+            lockProtectionEnabled: false,
+          }
+          console.log(
+            `SettingsPage: Calendar settings document not found for user ${userId}. Creating defaults.`
           )
+          setDoc(userSettingsDocRef, defaultCalendarSettings, { merge: true })
+            .then(() => {
+              setCalendarSettings(defaultCalendarSettings)
+              setMessage('Default calendar settings created.')
+              setMessageType('info')
+            })
+            .catch((e) => {
+              console.error('Error creating default calendar settings:', e)
+              setMessage('Failed to create default settings.')
+              setMessageType('error')
+            })
         }
       },
       (error) => {
@@ -77,12 +129,62 @@ export default function SettingsPage() {
         setMessageType('error')
       }
     )
+    // Store the unsubscribe function globally so it can be called during deletion
+    window.unsubscribeSettings = unsubscribeSettings
 
-    return () => unsubscribeSettings()
-  }, [db, userId, isAuthReady, appId]) // Removed `calendarSettings` from dependencies as it's not used for writing here
-
+    return () => {
+      // Cleanup on component unmount
+      if (unsubscribeSettings) {
+        unsubscribeSettings()
+      }
+    }
+  }, [db, userId, isAuthReady, appId, auth?.currentUser]) // Added auth?.currentUser to dependencies
+  const setDeletionSpinnerShow = () => {
+    setTimeout(() => {
+      document.body.style.overflow = 'hidden'
+    }, 0)
+    setDeletionSpinner(true)
+  }
+  const setDeletionSpinnerHide = () => {
+    document.body.style.overflow = ''
+    setDeletionSpinner(false)
+  }
+  const setClearSpinnerShow = () => {
+    setTimeout(() => {
+      document.body.style.overflow = 'hidden'
+    }, 0)
+    setClearSpinner(true)
+  }
+  const setClearSpinnerHide = () => {
+    document.body.style.overflow = ''
+    setClearSpinner(false)
+  }
+  const saveSettings = () => {
+    if (editSettings) {
+      if (
+        calendarSettings.popUpTime < 1000 ||
+        calendarSettings.popUpTime > 30000
+      ) {
+        setCalendarSettings((prev) => ({
+          ...prev,
+          popUpTime: calendarSettings.popUpTime < 1000 ? 1000 : 30000,
+        }))
+        setMessage(
+          `Notification active time cannot be  ${
+            calendarSettings.popUpTime < 1000 ? 'less than 1' : 'more than 30'
+          } seconds `
+        )
+        setMessageType('error')
+        return
+      }
+      handleSaveSettings()
+    } else {
+      setEditSettings(!editSettings)
+    }
+  }
   const handleSaveSettings = async () => {
     if (!db || !userId) return
+
     const userSettingsDocRef = doc(
       db,
       `artifacts/${appId}/users/${userId}/calendarSettings`,
@@ -90,11 +192,12 @@ export default function SettingsPage() {
     )
     try {
       await setDoc(userSettingsDocRef, calendarSettings, { merge: true })
-      setMessage('Calendar settings saved successfully!')
+      setMessage('Settings saved successfully!')
       setMessageType('success')
+      setEditSettings(!editSettings)
     } catch (e) {
-      console.error('Error saving calendar settings:', e)
-      setMessage('Failed to save calendar settings.')
+      console.error('Error saving settings:', e)
+      setMessage('Failed to save settings.')
       setMessageType('error')
     }
   }
@@ -108,7 +211,6 @@ export default function SettingsPage() {
         setMessageType('success')
         setShowConfirmSignOutModal(false)
         stopTimers()
-        // The App component will handle resetting state due to onAuthStateChanged
       } catch (error) {
         console.error('Error signing out:', error)
         setMessage('Error signing out.')
@@ -117,27 +219,78 @@ export default function SettingsPage() {
     }
   }
 
-  // Function: Clears all user data in Firestore but keeps the Auth account
+  const deleteAllUserCloudinaryImages = async () => {
+    const publicIdsToDelete = []
+
+    const measurementsCollectionRef = collection(
+      db,
+      `artifacts/${appId}/users/${userId}/measurements`
+    )
+    const measurementsSnapshot = await getDocs(query(measurementsCollectionRef))
+    measurementsSnapshot.forEach((docSnap) => {
+      const data = docSnap.data()
+      if (data.imageUrls && Array.isArray(data.imageUrls)) {
+        data.imageUrls.forEach((img) => {
+          if (img.public_id) {
+            publicIdsToDelete.push(img.public_id)
+          }
+        })
+      }
+    })
+
+    const galleryCollectionRef = collection(
+      db,
+      `artifacts/${appId}/users/${userId}/userGalleryImages`
+    )
+    const gallerySnapshot = await getDocs(query(galleryCollectionRef))
+    gallerySnapshot.forEach((docSnap) => {
+      const data = docSnap.data()
+      if (data.public_id) {
+        publicIdsToDelete.push(data.public_id)
+      }
+    })
+
+    if (publicIdsToDelete.length > 0) {
+      console.log(
+        `Attempting to delete ${publicIdsToDelete.length} images from Cloudinary.`
+      )
+      const deletePromises = publicIdsToDelete.map(async (publicId) => {
+        try {
+          await deleteCloudinaryImage(publicId)
+          console.log(`Deleted Cloudinary image: ${publicId}`)
+        } catch (e) {
+          console.error(`Error deleting Cloudinary image ${publicId}:`, e)
+        }
+      })
+      await Promise.all(deletePromises)
+      console.log('Finished attempting to delete all user Cloudinary images.')
+    } else {
+      console.log('No Cloudinary images found to delete for this user.')
+    }
+  }
+
   const handleClearData = async () => {
     if (!db || !userId || !auth) {
       setMessage('Error: Firebase not initialized or user not logged in.')
       setMessageType('error')
       return
     }
-
+    setShowConfirmClearDataModal(false)
     setMessage('Clearing all your data...')
     setMessageType('info')
 
     try {
-      stopTimers() // Stop timers before data manipulation
+      stopTimers()
+      setClearSpinnerShow()
+      await deleteAllUserCloudinaryImages()
 
       const batch = writeBatch(db)
 
-      // Define paths to all user-specific collections
       const collectionsToClear = [
         'calendarSettings',
         'measurements',
-        'userProfile', // User profile data will be cleared, but Auth account remains
+        'userGalleryImages',
+        'userProfile',
         'workoutPlans',
         'workouts',
       ]
@@ -164,15 +317,10 @@ export default function SettingsPage() {
         }
       }
 
-      // Commit the batch deletion
       await batch.commit()
 
-      setMessage(
-        'All data cleared successfully! Signing you out for a fresh start...'
-      )
+      setMessage('All data cleared successfully!')
       setMessageType('success')
-      setShowConfirmClearDataModal(false)
-      await signOut(auth) // Sign out after data deletion to force a fresh state
     } catch (error) {
       console.error('Error clearing all data:', error.message)
       setMessage(
@@ -183,30 +331,44 @@ export default function SettingsPage() {
         }`
       )
       setMessageType('error')
-      setShowConfirmClearDataModal(false)
     }
+    setClearSpinnerHide()
   }
 
-  // Function: Deletes the Firebase Auth account AND all associated Firestore data
-  const handleDeleteAccount = async () => {
-    if (!db || !userId || !auth) {
+  const executeAccountAndDataDeletion = async () => {
+    if (!db || !userId || !auth || !auth.currentUser) {
       setMessage('Error: Firebase not initialized or user not logged in.')
       setMessageType('error')
-      return
+      return false
     }
 
-    setMessage('Deleting account and all data...')
+    // --- CRITICAL: Explicitly unsubscribe the SettingsPage's listener here ---
+    // This is vital to prevent it from reacting to the deletion and re-creating data.
+    if (typeof window.unsubscribeSettings === 'function') {
+      try {
+        window.unsubscribeSettings()
+        console.log(
+          'SettingsPage: Unsubscribed from calendarSettings snapshot before deletion.'
+        )
+      } catch (e) {
+        console.error('SettingsPage: Failed to unsubscribe snapshot:', e)
+      }
+    }
+    // --- END CRITICAL ---
+
+    setMessage('Finalizing data deletion...')
     setMessageType('info')
 
     try {
-      stopTimers() // Stop timers before data manipulation
+      stopTimers()
+
+      await deleteAllUserCloudinaryImages()
 
       const batch = writeBatch(db)
-
-      // Define paths to all user-specific collections
       const collectionsToDelete = [
-        'calendarSettings',
+        'calendarSettings', // This will be deleted by the batch
         'measurements',
+        'userGalleryImages',
         'userProfile',
         'workoutPlans',
         'workouts',
@@ -233,66 +395,94 @@ export default function SettingsPage() {
           })
         }
       }
-
-      // Commit the batch deletion
       await batch.commit()
 
-      // Delete the user's authentication record
-      if (auth.currentUser && auth.currentUser.uid === userId) {
-        await auth.currentUser.delete()
-      } else {
-        console.warn(
-          'User auth record not found or mismatch, skipping auth.currentUser.delete()'
-        )
-      }
-
-      setMessage('Account and all data deleted successfully! Signing you out...')
+      setMessage('All data deleted successfully!')
       setMessageType('success')
-      setShowConfirmDeleteAccountModal(false)
-      await signOut(auth) // Sign out after auth record deletion
+      return true
     } catch (error) {
-      console.error('Error deleting account and data:', error.message)
+      console.error('Error during final data deletion:', error.message)
       setMessage(
-        `Deletion Failed: ${
-          error.message === 'Firebase: Error (auth/requires-recent-login).'
-            ? 'Re-login required before deleting your account'
-            : error.message
-        }`
+        `Deletion Failed: ${error.message || 'An unexpected error occurred.'}`
       )
       setMessageType('error')
-      setShowConfirmDeleteAccountModal(false)
+      return false
     }
+  }
+
+  const handleReauthenticate = async () => {
+    setReauthError('')
+    if (!auth.currentUser || !userEmail || !reauthPassword) {
+      setReauthError('Please enter your email and password.')
+      return
+    }
+
+    const credential = EmailAuthProvider.credential(userEmail, reauthPassword)
+
+    try {
+      await reauthenticateWithCredential(auth.currentUser, credential)
+      console.log('User re-authenticated successfully.')
+      setShowReauthModal(false)
+      setReauthPassword('')
+      setDeletionSpinnerShow()
+      const dataDeleted = await executeAccountAndDataDeletion()
+      if (dataDeleted) {
+        // --- This is where the actual Firebase Auth user deletion happens ---
+        await auth.currentUser.delete()
+        await signOut(auth) // Sign out after deletion to ensure state is clear
+        setMessage(
+          'Account and all data deleted successfully! You have been signed out.'
+        )
+        setMessageType('success')
+      } else {
+        setMessage('Data deletion failed, account not deleted.')
+        setMessageType('error')
+      }
+    } catch (error) {
+      console.error('Re-authentication failed:', error)
+      let errorMessage = 'Re-authentication failed. Please check your password.'
+      if (
+        error.code === 'auth/wrong-password' ||
+        error.code === 'auth/invalid-credential'
+      ) {
+        errorMessage = 'Incorrect password. Please try again.'
+      } else if (error.code === 'auth/user-not-found') {
+        errorMessage = 'User not found. Please log in again.'
+      }
+      setReauthError(errorMessage)
+    }
+    setDeletionSpinnerHide()
+  }
+
+  const handleDeleteAccount = async () => {
+    if (!auth || !auth.currentUser || !userEmail) {
+      setMessage('Error: User not logged in or email not available.')
+      setMessageType('error')
+      setShowConfirmDeleteAccountModal(false)
+      return
+    }
+
+    setShowConfirmDeleteAccountModal(false)
+    setShowReauthModal(true)
+    setMessage(
+      'For your security, please re-enter your password to confirm account deletion.'
+    )
+    setMessageType('info')
   }
 
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
   return (
-    <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-6 p-3 rounded-xl text-gray-100'>
+    <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-6 p-3 rounded-xl text-gray-100 select-none'>
       <h2 className='sm:text-2xl text-xl font-bold text-blue-400 mb-6'>
         ⚙️ Settings
       </h2>
 
-      {message && (
-        <div
-          role='status'
-          aria-live='polite'
-          className={`sm:p-3 p-1.5 mb-4 rounded-md text-center ${
-            messageType === 'success'
-              ? 'bg-green-800 text-green-200'
-              : messageType === 'error'
-              ? 'bg-red-800 text-red-200'
-              : 'bg-blue-800 text-blue-200'
-          }`}
-        >
-          {message}
-        </div>
-      )}
-
-      <fieldset className='mb-8 bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-2 sm:p-4 rounded-lg '>
+      <div className='mb-8 bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-2 sm:p-4 rounded-lg '>
         <h3 className='sm:text-xl text-lg font-semibold text-gray-200 mb-2 sm:mb-3'>
           Calendar Preferences
         </h3>
-        <div className='mb-4'>
+        <fieldset className='mb-4'>
           <label className='flex flex-col text-gray-300 font-semibold mb-2 '>
             <span>Workout Days:</span>
             <span
@@ -310,7 +500,11 @@ export default function SettingsPage() {
             {daysOfWeek.map((day, index) => (
               <label
                 key={`workout-${index}`}
-                className='flex items-center sm:space-x-2 space-x-1  py-1 px-2  rounded-md cursor-pointer border border-gray-950 bg-gray-900 hover:shadow-[0px_0px_0px_0px_#030712] shadow-[5px_5px_0px_0px_#030712] duration-500'
+                className={`flex items-center sm:space-x-2 space-x-1  py-1 px-2  rounded-md  border border-gray-950 bg-gray-900 ${
+                  editSettings
+                    ? 'hover:shadow-[0px_0px_0px_0px_#030712] cursor-pointer'
+                    : ''
+                } shadow-[5px_5px_0px_0px_#030712] duration-500`}
               >
                 <input
                   type='checkbox'
@@ -335,20 +529,74 @@ export default function SettingsPage() {
                   }}
                   className='form-checkbox h-3 w-3 sm:h-5 sm:w-5 text-blue-500 rounded-md bg-gray-700 border-gray-500 checked:bg-blue-500'
                   aria-label={`Toggle ${day} as a workout day`}
+                  disabled={!editSettings}
                 />
                 <span>{day}</span>
               </label>
             ))}
           </div>
+        </fieldset>
+        <div className='flex items-center justify-between w-full mt-10'>
+          <h3 className='sm:text-xl text-lg font-semibold text-gray-200 mb-2 sm:mb-3'>
+            Notification Active Time (sec) :
+          </h3>
+          <input
+            type='number'
+            min={1}
+            max={30}
+            aria-label='pop up time'
+            value={calendarSettings.popUpTime / 1000} // Derive from calendarSettings
+            onChange={(e) =>
+              setCalendarSettings((prev) => ({
+                ...prev,
+                popUpTime: parseInt(e.target.value || '0') * 1000,
+              }))
+            } // Update calendarSettings directly
+            className={`p-1.5 sm:p-3 w-full  ${
+              editSettings ? 'bg-gray-700' : 'bg-gray-900'
+            } shadow-[5px_5px_0px_0px_#030712] border border-gray-950 ml-5 max-w-[200px] rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100`}
+            disabled={!editSettings}
+          />
         </div>
+        <fieldset className='my-8'>
+          <h3 className='sm:text-xl text-lg font-semibold text-gray-200 mb-2 sm:mb-3'>
+            Security Settings
+          </h3>
+          <div className='mb-4 flex items-center justify-between'>
+            <label
+              htmlFor='lock-protection-toggle'
+              className='flex-grow text-gray-400 font-semibold cursor-pointer italic text-sm'
+            >
+              Enable Lock Protection (Require password on app launch)
+            </label>
+            <input
+              type='checkbox'
+              id='lock-protection-toggle'
+              checked={calendarSettings.lockProtectionEnabled}
+              onChange={(e) => {
+                setCalendarSettings((prev) => ({
+                  ...prev,
+                  lockProtectionEnabled: e.target.checked,
+                }))
+              }}
+              className='form-checkbox h-5 w-5 text-blue-500 rounded-md bg-gray-700 border-gray-500  checked:bg-blue-500 ml-4'
+              aria-label='Toggle lock protection on app launch'
+              disabled={!editSettings}
+            />
+          </div>
+        </fieldset>
         <button
-          onClick={handleSaveSettings}
-          className='w-full px-2 py-1 sm:px-4 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
-          aria-label='Save calendar settings'
+          onClick={saveSettings}
+          className={`sm:px-4 sm:py-2 px-2 py-1 text-sm sm:text-base  text-white rounded-md w-full transition-colors shadow-[2px_2px_0px_0px_#030712] border border-gray-950 ${
+            editSettings
+              ? 'hover:bg-green-700 bg-green-600'
+              : 'hover:bg-indigo-700 bg-indigo-600'
+          }`}
         >
-          Save Calendar Settings
+          {editSettings ? 'Save Settings' : '✏️ Edit Settings'}
         </button>
-      </fieldset>
+      </div>
+      {/* --- END NEW --- */}
 
       <div className='bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-4 rounded-lg flex flex-col gap-2 mb-8'>
         <h3 className='sm:text-xl text-lg font-semibold text-gray-200 mb-3'>
@@ -421,14 +669,14 @@ export default function SettingsPage() {
           className='w-full px-2 py-1 sm:px-4 sm:py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
           aria-label='Clear all your workout data'
         >
-          🧹 Clear Data
+          🧹 Clear All My Data
         </button>
         <button
           onClick={() => setShowConfirmDeleteAccountModal(true)} // This button now deletes account + all data
           className='w-full px-2 py-1 sm:px-4 sm:py-2 bg-red-800 text-white rounded-md hover:bg-red-900 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
           aria-label='Permanently delete your account and all associated data'
         >
-          🗑️ Delete Account
+          🔥 Delete My Account
         </button>
       </div>
 
@@ -480,8 +728,7 @@ export default function SettingsPage() {
             <span className='font-bold text-orange-300'>WARNING:</span> This
             action will permanently delete ALL your workout logs, measurements,
             and settings from the database. Your **user account will remain**,
-            and you will be signed out. You can sign back in to a brand new,
-            empty account. This cannot be undone.
+            and you will **remain logged in**. This cannot be undone.
             <br />
             <br />
             Are you absolutely sure you want to proceed?
@@ -533,7 +780,7 @@ export default function SettingsPage() {
               Cancel
             </button>
             <button
-              onClick={handleDeleteAccount}
+              onClick={handleDeleteAccount} // This will now always trigger reauth flow
               className='px-2 py-1 sm:px-4 sm:py-2 bg-red-800 text-white rounded-md hover:bg-red-900 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 transition-colors'
               aria-label='Confirm and delete my account and all data'
             >
@@ -541,6 +788,72 @@ export default function SettingsPage() {
             </button>
           </div>
         </Modal>
+      )}
+
+      {showReauthModal && (
+        <Modal onClose={() => setShowReauthModal(false)}>
+          <h3 className='text-xl font-bold text-blue-400 mb-4 mr-[34px]'>
+            Re-authenticate for Security
+          </h3>
+          <p className='text-gray-200 mb-2'>
+            For your security, please re-enter your password to confirm this
+            sensitive action.
+            <span className='mt-2 block'>
+              Email:{' '}
+              <span className='font-mono text-blue-300 mb-2 '>
+                {' '}
+                {userEmail}
+              </span>
+            </span>
+          </p>
+          <input
+            type='password'
+            placeholder='Your Password'
+            value={reauthPassword}
+            onChange={(e) => setReauthPassword(e.target.value)}
+            className='p-3 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 mb-4'
+          />
+          {reauthError && (
+            <p className='text-red-400 text-sm mb-4'>{reauthError}</p>
+          )}
+          <div className='flex justify-end space-x-3'>
+            <button
+              onClick={() => setShowReauthModal(false)}
+              className='px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleReauthenticate}
+              className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
+            >
+              Confirm Re-authenticate
+            </button>
+          </div>
+        </Modal>
+      )}
+      {deletionSpinner && (
+        <div className='fixed inset-0 h-screen  w-screen overflow-hidden  select-none top-0 left-0 backdrop-blur-lg bg-opacity-20 bg-gray-900 z-[50] flex items-center justify-center'>
+          <div className='bg-red-800 text-white p-6 rounded-lg text-center relative sm:max-w-sm w-full animate-flash max-w-[85vw] shadow-[5px_5px_0px_0px_#030712] border border-gray-300 bg-opacity-75 flex flex-col items-center'>
+            <h2
+              id='deletion-account-progress'
+              className='text-lg font-bold mb-4'
+            >
+              Deleting Data & Account
+            </h2>
+            <span className='flex animate-spin w-10 h-10 border-4 border-t-transparent border-gray-300 rounded-full'></span>
+          </div>
+        </div>
+      )}
+      {clearSpinner && (
+        <div className='fixed inset-0 h-screen  w-screen overflow-hidden  select-none top-0 left-0 backdrop-blur-lg bg-opacity-20 bg-gray-900 z-[50] flex items-center justify-center'>
+          <div className='bg-orange-600 text-white p-6 rounded-lg text-center relative sm:max-w-sm w-full animate-flash max-w-[85vw] shadow-[5px_5px_0px_0px_#030712] border border-gray-300 bg-opacity-75 flex flex-col items-center'>
+            <h2 id='clearing-data-progress' className='text-lg font-bold mb-4'>
+              Clearing Data
+            </h2>
+            <span className='flex animate-spin w-10 h-10 border-4 border-t-transparent border-gray-300 rounded-full'></span>
+          </div>
+        </div>
       )}
     </div>
   )

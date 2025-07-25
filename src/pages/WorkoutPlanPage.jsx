@@ -1,10 +1,19 @@
-import WorkoutDayCard from '../components/workoutDayCard'
+import WorkoutPlanCard from '../components/WorkoutPlanCard' // Renamed import
 import { useFirebase } from '../context/FirebaseContext'
 import { useState, useEffect } from 'react'
-import { doc, setDoc, onSnapshot, collection } from 'firebase/firestore'
+import {
+  doc,
+  setDoc,
+  onSnapshot,
+  collection,
+  addDoc, // Import addDoc for adding new plans
+  deleteDoc, // Import deleteDoc for deleting plans
+} from 'firebase/firestore'
 import { useTimer } from '../context/TimerContext'
 import { formatTime, runWithTimeout } from '../util/utils'
 import RestTimerModal from '../components/RestTimerModal'
+import { useMessage } from '../context/MessageContext'
+import Modal from '../components/Modal' // Import the Modal component
 
 export default function WorkoutPlanPage() {
   const { db, userId, isAuthReady } = useFirebase()
@@ -22,10 +31,16 @@ export default function WorkoutPlanPage() {
     countdownIsRunning,
     setCountdownIsRunning,
   } = useTimer()
-  const [workoutPlans, setWorkoutPlans] = useState({}) // { 'monday': { exercises: [] }, ... }
-  const [editingDay, setEditingDay] = useState(null) // 'monday', 'tuesday', etc. or null
-  const [message, setMessage] = useState('')
-  const [messageType, setMessageType] = useState('')
+  // workoutPlans will now be an array of plan objects
+  const [workoutPlans, setWorkoutPlans] = useState([])
+  const [editingPlanId, setEditingPlanId] = useState(null) // Tracks which plan is being edited by its ID
+  const { setMessage, setMessageType } = useMessage()
+
+  // --- NEW STATE FOR DELETE CONFIRMATION ---
+  const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false)
+  const [planToDeleteId, setPlanToDeleteId] = useState(null)
+  const [planToDeleteName, setPlanToDeleteName] = useState('')
+  // --- END NEW STATE ---
 
   const appId =
     import.meta.env.VITE_FIREBASE_APP_ID || 'workout-tracker-app-local' // Consistent app ID
@@ -63,7 +78,7 @@ export default function WorkoutPlanPage() {
     setCountdownIsRunning(false) // Pause when setting new time
   }
 
-  // Fetch workout plans
+  // Fetch workout plans from Firestore
   useEffect(() => {
     if (!db || !userId || !isAuthReady) return
 
@@ -74,9 +89,10 @@ export default function WorkoutPlanPage() {
     const unsubscribe = onSnapshot(
       workoutPlansCollectionRef,
       (snapshot) => {
-        const fetchedPlans = {}
+        const fetchedPlans = []
         snapshot.forEach((doc) => {
-          fetchedPlans[doc.id] = doc.data()
+          // Store the document ID along with the data
+          fetchedPlans.push({ id: doc.id, ...doc.data() })
         })
         setWorkoutPlans(fetchedPlans)
       },
@@ -90,43 +106,107 @@ export default function WorkoutPlanPage() {
     return () => unsubscribe()
   }, [db, userId, isAuthReady, appId])
 
-  const handleSaveWorkoutPlan = async (day, updatedExercises) => {
+  const handleAddPlan = async () => {
     if (!db || !userId) return
 
-    const dayDocRef = doc(
+    setMessage('Adding new workout plan...')
+    setMessageType('info')
+
+    const newPlan = {
+      name: 'New Workout Plan', // Default name
+      exercises: [], // Start with no exercises
+      createdAt: new Date(), // Timestamp for ordering
+    }
+
+    try {
+      // Add a new document to the 'workoutPlans' collection
+      const docRef = await addDoc(
+        collection(db, `artifacts/${appId}/users/${userId}/workoutPlans`),
+        newPlan
+      )
+      setMessage(`New plan "${newPlan.name}" added successfully!`)
+      setMessageType('success')
+      setEditingPlanId(docRef.id) // Immediately go into edit mode for the new plan
+    } catch (e) {
+      console.error('Error adding new workout plan:', e)
+      setMessage('Failed to add new workout plan.')
+      setMessageType('error')
+    }
+  }
+
+  const handleSaveWorkoutPlan = async (planId, newName, updatedExercises) => {
+    if (!db || !userId) return
+
+    setMessage('Saving workout plan...')
+    setMessageType('info')
+
+    const planDocRef = doc(
       db,
       `artifacts/${appId}/users/${userId}/workoutPlans`,
-      day
+      planId
     )
     try {
       await runWithTimeout(
-        setDoc(dayDocRef, { exercises: updatedExercises }, { merge: true }),
+        setDoc(
+          planDocRef,
+          { name: newName, exercises: updatedExercises }, // Update both name and exercises
+          { merge: true }
+        ),
         2000
       )
-      setMessage(`Workout plan for ${day} saved successfully!`)
+      setMessage(`Workout plan "${newName}" saved successfully!`)
       setMessageType('success')
-      setEditingDay(null) // ✅ this is probably what you want
+      setEditingPlanId(null) // Exit editing mode
     } catch (e) {
       if (e.message === 'timeout') {
         setMessage('Saved offline! Will sync later.')
         setMessageType('success')
-        setEditingDay(null) // ✅ still exit editing even if offline
+        setEditingPlanId(null) // still exit editing even if offline
       } else {
-        setMessage(`Failed to save workout plan for ${day}.`)
+        setMessage(`Failed to save workout plan "${newName}".`)
         setMessageType('error')
       }
     }
   }
 
-  const daysOfWeek = [
-    'sunday',
-    'monday',
-    'tuesday',
-    'wednesday',
-    'thursday',
-    'friday',
-    'saturday',
-  ]
+  // --- UPDATED: handleDeletePlan to show confirmation modal ---
+  const handleDeletePlan = (planId, planName) => {
+    setPlanToDeleteId(planId)
+    setPlanToDeleteName(planName)
+    setShowConfirmDeleteModal(true)
+  }
+
+  // --- NEW: confirmDeletePlan function to perform actual deletion ---
+  const confirmDeletePlan = async () => {
+    if (!db || !userId || !planToDeleteId) return
+
+    setMessage('Deleting workout plan...')
+    setMessageType('info')
+
+    const planDocRef = doc(
+      db,
+      `artifacts/${appId}/users/${userId}/workoutPlans`,
+      planToDeleteId
+    )
+
+    try {
+      await deleteDoc(planDocRef)
+      setMessage('Workout plan deleted successfully!')
+      setMessageType('success')
+      if (editingPlanId === planToDeleteId) {
+        setEditingPlanId(null) // Exit editing mode if the deleted plan was being edited
+      }
+      setShowConfirmDeleteModal(false) // Close the modal
+      setPlanToDeleteId(null) // Clear ID
+      setPlanToDeleteName('') // Clear name
+    } catch (e) {
+      console.error('Error deleting workout plan:', e)
+      setMessage('Failed to delete workout plan.')
+      setMessageType('error')
+      setShowConfirmDeleteModal(false) // Close the modal even on error
+    }
+  }
+  // --- END NEW ---
 
   // Inside the component
   const [timerSeconds, setTimerSeconds] = useState(0)
@@ -143,20 +223,6 @@ export default function WorkoutPlanPage() {
       <h2 className='sm:text-2xl text-xl font-bold text-blue-400 mb-6'>
         💪 Workout Plans & Timers
       </h2>
-
-      {message && (
-        <div
-          role='status'
-          aria-live='polite'
-          className={`p-3 mb-4 rounded-md text-center ${
-            messageType === 'success'
-              ? 'bg-green-800 text-green-200'
-              : 'bg-red-800 text-red-200'
-          }`}
-        >
-          {message}
-        </div>
-      )}
 
       {/* Timers Section */}
       <section
@@ -215,7 +281,7 @@ export default function WorkoutPlanPage() {
                   e.stopPropagation()
                   setShowMiniStopwatch(showMiniStopwatch ? false : true)
                 }}
-                className={`${stopwatchTime==0&&'hidden'} px-1.5 py-0.5 sm:px-3 sm:py-1 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 bg-gray-900 text-white rounded-md hover:bg-gray-800 ml-auto transition-colors`}
+                className={` px-1.5 py-0.5 sm:px-3 sm:py-1 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 bg-gray-900 text-white rounded-md hover:bg-gray-800 ml-auto transition-colors`}
                 aria-label={
                   showMiniStopwatch
                     ? 'Hide floating stopwatch'
@@ -332,7 +398,9 @@ export default function WorkoutPlanPage() {
                   e.stopPropagation()
                   setShowMiniCountdown(showMiniCountdown ? false : true)
                 }}
-                className={`${countdownTime==0&&'hidden'} px-1.5 py-0.5 sm:px-3 sm:py-1 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 bg-gray-900 text-white rounded-md hover:bg-gray-800 ml-auto transition-colors`}
+                className={`${
+                  countdownTime == 0 && 'hidden'
+                } px-1.5 py-0.5 sm:px-3 sm:py-1 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 bg-gray-900 text-white rounded-md hover:bg-gray-800 ml-auto transition-colors`}
                 aria-label={
                   showMiniCountdown
                     ? 'Hide floating countdown timer'
@@ -404,20 +472,65 @@ export default function WorkoutPlanPage() {
           id='workout-plan-heading'
           className='sm:text-xl md:text-2xl text-lg font-semibold text-gray-200 mb-3'
         >
-          Workout Plan
+          My Workout Plans
         </h3>
-        {daysOfWeek.map((day) => (
-          <WorkoutDayCard
-            key={day}
-            dayName={day}
-            exercises={workoutPlans[day]?.exercises || []}
-            isEditing={editingDay === day}
-            onEditToggle={() => setEditingDay(editingDay === day ? null : day)}
-            onSave={handleSaveWorkoutPlan}
-            aria-label={`Workout plan for ${day}`}
+        {workoutPlans.length === 0 && (
+          <p className='text-gray-400 text-center py-4'>
+            No workout plans added yet. Click "Add New Plan" to get started!
+          </p>
+        )}
+        {workoutPlans.map((plan) => (
+          <WorkoutPlanCard
+            key={plan.id}
+            planId={plan.id}
+            planName={plan.name}
+            exercises={plan.exercises || []}
+            isEditing={editingPlanId === plan.id}
+            onEditToggle={() =>
+              setEditingPlanId(editingPlanId === plan.id ? null : plan.id)
+            }
+            onSaveExercises={handleSaveWorkoutPlan} // Pass the updated save handler
+            onDeletePlan={(id) => handleDeletePlan(id, plan.name)} // Pass planId and planName to handler
+            aria-label={`Workout plan for ${plan.name}`}
           />
         ))}
+        <div className='mt-6 text-center'>
+          <button
+            onClick={handleAddPlan}
+            className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950'
+          >
+            ➕ Add New Plan
+          </button>
+        </div>
       </section>
+
+      {/* Confirmation Modal for deleting a plan */}
+      {showConfirmDeleteModal && (
+        <Modal onClose={() => setShowConfirmDeleteModal(false)}>
+          <h3 className='text-xl font-bold text-red-400 mb-4 mr-[34px]'>
+            Confirm Delete Workout Plan
+          </h3>
+          <p className='text-gray-200 mb-6'>
+            Are you sure you want to permanently delete the workout plan "
+            <span className='font-bold text-red-300'>{planToDeleteName}</span>
+            "? This action cannot be undone.
+          </p>
+          <div className='flex justify-end space-x-3'>
+            <button
+              onClick={() => setShowConfirmDeleteModal(false)}
+              className='px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950'
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmDeletePlan}
+              className='px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950'
+            >
+              Delete Plan
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

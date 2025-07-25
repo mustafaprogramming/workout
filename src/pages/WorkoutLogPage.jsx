@@ -5,6 +5,7 @@ import { formatDate } from '../util/utils'
 import { doc, setDoc, onSnapshot } from 'firebase/firestore'
 import { useNavigation } from '../context/NavigationContext'
 import { ROUTES } from '../route'
+import { useMessage } from '../context/MessageContext'
 
 export default function WorkoutLogPage({ selectedDate }) {
   const { setCurrentPage } = useNavigation()
@@ -13,8 +14,7 @@ export default function WorkoutLogPage({ selectedDate }) {
   const [currentExerciseName, setCurrentExerciseName] = useState('')
   const [currentSets, setCurrentSets] = useState([]) // Array of { reps, weight, restTime, rpe } for the current exercise being added
   const [workoutDuration, setWorkoutDuration] = useState('') // New state for workout duration
-  const [message, setMessage] = useState('')
-  const [messageType, setMessageType] = useState('') // 'success' or 'error'
+  const {  setMessage, setMessageType } = useMessage()
   const [showConfirmDeleteExerciseModal, setShowConfirmDeleteExerciseModal] =
     useState(false)
   const [exerciseToDeleteId, setExerciseToDeleteId] = useState(null)
@@ -22,7 +22,8 @@ export default function WorkoutLogPage({ selectedDate }) {
 
   const formattedDate = formatDate(selectedDate) // YYYY-MM-DD
   // Use a fixed app ID for Firestore path as __app_id is not available locally
-  const appId = import.meta.env.VITE_FIREBASE_APP_ID||'workout-tracker-app-local' // Or any unique string for your local app
+  const appId =
+    import.meta.env.VITE_FIREBASE_APP_ID || 'workout-tracker-app-local' // Or any unique string for your local app
 
   useEffect(() => {
     if (!db || !userId || !isAuthReady) return
@@ -194,39 +195,27 @@ export default function WorkoutLogPage({ selectedDate }) {
         🏋️ Workout Log for {selectedDate.toDateString()}
       </h2>
 
-      {message && (
-        <div
-          role="status"
-          aria-live="polite"
-          className={`sm:p-3 p-1 mb-4 rounded-md text-center ${
-            messageType === 'success'
-              ? 'bg-green-800 text-green-200'
-              : 'bg-red-800 text-red-200'
-          }`}
-        >
-          {message}
-        </div>
-      )}
-
       <section className='mb-6 bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-4 p-2 rounded-lg '>
         <h3 className='sm:text-xl text-base font-semibold text-gray-200 mb-3'>
           Workout Details
         </h3>
         <div className='flex flex-col sm:flex-row gap-3 mb-4'>
-          <label htmlFor="workout-duration" className="sr-only">Workout Duration</label>
+          <label htmlFor='workout-duration' className='sr-only'>
+            Workout Duration
+          </label>
           <input
-            id="workout-duration"
+            id='workout-duration'
             type='text'
             placeholder='Workout Duration (e.g., 1h 30m)'
             value={workoutDuration}
             onChange={(e) => setWorkoutDuration(e.target.value)}
             className='flex-grow p-1.5 sm:p-3 bg-gray-800  rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 shadow-[4px_4px_0px_0px_#030712] border border-gray-950'
-            aria-label="Enter workout duration, for example 1 hour 30 minutes"
+            aria-label='Enter workout duration, for example 1 hour 30 minutes'
           />
           <button
             onClick={handleSaveDuration}
             className='px-2 py-1 sm:px-4 sm:py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950'
-            aria-label="Save workout duration"
+            aria-label='Save workout duration'
           >
             Save Duration
           </button>
@@ -235,30 +224,38 @@ export default function WorkoutLogPage({ selectedDate }) {
         <h3 className='sm:text-xl text-base font-semibold text-gray-200 mb-3'>
           Add New Exercise
         </h3>
-        <label htmlFor="exercise-name" className="sr-only">Exercise Name</label>
+        <label htmlFor='exercise-name' className='sr-only'>
+          Exercise Name
+        </label>
         <input
-          id="exercise-name"
+          id='exercise-name'
           type='text'
           placeholder='Exercise Name (e.g., Bench Press)'
           value={currentExerciseName}
           onChange={(e) => setCurrentExerciseName(e.target.value)}
           className='sm:p-3 p-1.5 mb-1.5 sm:mb-3 w-full bg-gray-800 shadow-[4px_4px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 '
-          aria-label="Enter exercise name, for example Bench Press"
+          aria-label='Enter exercise name, for example Bench Press'
         />
 
-        <div className='space-y-1 sm:space-y-2 mb-3' role="group" aria-label="Current sets for new exercise">
+        <div
+          className='space-y-1 sm:space-y-2 mb-3'
+          role='group'
+          aria-label='Current sets for new exercise'
+        >
           {currentSets.map((set, index) => (
             <div
               key={index}
               className='grid sm:gap-2 gap-1 items-center bg-gray-800 sm:p-3 p-1 shadow-[4px_4px_0px_0px_#030712] border border-gray-950 rounded-md'
-              role="group"
+              role='group'
               aria-label={`Set ${index + 1} details`}
             >
               <span className='text-gray-300 font-medium '>
                 Set {index + 1}:
               </span>
               <div className='flex w-full sm:gap-2 gap-1 overflow-x-auto pb-1'>
-                <label htmlFor={`reps-input-${index}`} className="sr-only">Reps for Set {index + 1}</label>
+                <label htmlFor={`reps-input-${index}`} className='sr-only'>
+                  Reps for Set {index + 1}
+                </label>
                 <input
                   id={`reps-input-${index}`}
                   type='number'
@@ -270,7 +267,9 @@ export default function WorkoutLogPage({ selectedDate }) {
                   className='p-1 sm:p-2 bg-gray-900 shadow-[2px_2px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 flex-1'
                   aria-label={`Enter reps for set ${index + 1}`}
                 />
-                <label htmlFor={`weight-input-${index}`} className="sr-only">Weight in kilograms for Set {index + 1}</label>
+                <label htmlFor={`weight-input-${index}`} className='sr-only'>
+                  Weight in kilograms for Set {index + 1}
+                </label>
                 <input
                   id={`weight-input-${index}`}
                   type='number'
@@ -283,7 +282,9 @@ export default function WorkoutLogPage({ selectedDate }) {
                   className='p-1 sm:p-2 bg-gray-900 shadow-[2px_2px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 flex-1'
                   aria-label={`Enter weight in kilograms for set ${index + 1}`}
                 />
-                <label htmlFor={`rest-time-input-${index}`} className="sr-only">Rest Time for Set {index + 1}</label>
+                <label htmlFor={`rest-time-input-${index}`} className='sr-only'>
+                  Rest Time for Set {index + 1}
+                </label>
                 <input
                   id={`rest-time-input-${index}`}
                   type='text'
@@ -293,9 +294,13 @@ export default function WorkoutLogPage({ selectedDate }) {
                     handleUpdateSet(index, 'restTime', e.target.value)
                   }
                   className='p-1 sm:p-2 bg-gray-900 shadow-[2px_2px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 flex-1'
-                  aria-label={`Enter rest time for set ${index + 1}, for example 60 seconds`}
+                  aria-label={`Enter rest time for set ${
+                    index + 1
+                  }, for example 60 seconds`}
                 />
-                <label htmlFor={`rpe-input-${index}`} className="sr-only">RPE for Set {index + 1}</label>
+                <label htmlFor={`rpe-input-${index}`} className='sr-only'>
+                  RPE for Set {index + 1}
+                </label>
                 <input
                   id={`rpe-input-${index}`}
                   type='number'
@@ -307,7 +312,9 @@ export default function WorkoutLogPage({ selectedDate }) {
                     handleUpdateSet(index, 'rpe', e.target.value)
                   }
                   className='p-1 sm:p-2 bg-gray-900 shadow-[2px_2px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 flex-1 '
-                  aria-label={`Enter RPE (Rate of Perceived Exertion) for set ${index + 1}, from 1 to 10`}
+                  aria-label={`Enter RPE (Rate of Perceived Exertion) for set ${
+                    index + 1
+                  }, from 1 to 10`}
                 />
                 <button
                   onClick={() => handleDeleteSet(index)}
@@ -324,7 +331,7 @@ export default function WorkoutLogPage({ selectedDate }) {
         <button
           onClick={handleAddSet}
           className='px-2 py-1 sm:px-4 sm:py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 mb-2 sm:mb-4 w-full'
-          aria-label="Add a new set to the current exercise"
+          aria-label='Add a new set to the current exercise'
         >
           ➕ Add Set
         </button>
@@ -332,53 +339,104 @@ export default function WorkoutLogPage({ selectedDate }) {
         <button
           onClick={handleAddExercise}
           className='px-2 py-1 sm:px-4 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full'
-          aria-label="Add current exercise and its sets to the workout log"
+          aria-label='Add current exercise and its sets to the workout log'
         >
           Add Exercise to Log
         </button>
       </section>
 
       <section className='mb-6 overflow-hidden rounded-lg  shadow-[5px_5px_0px_0px_#030712] border border-gray-950'>
-        <h3 className="sr-only">Logged Exercises</h3> {/* Visually hidden heading for table context */}
+        <h3 className='sr-only'>Logged Exercises</h3>{' '}
+        {/* Visually hidden heading for table context */}
         {exercises.length === 0 ? (
           <p className='text-gray-400 p-2'>
             No exercises logged for this day yet.
           </p>
         ) : (
           <div className='overflow-x-auto pb-1 '>
-            <table className='min-w-full bg-gray-900 rounded-lg overflow-hidden  text-nowrap' role="table" aria-label={`Workout log for ${selectedDate.toDateString()}`}>
-              <thead role="rowgroup">
-                <tr className='bg-gray-950 text-gray-300 uppercase sm:text-sm text-xs leading-normal' role="row">
-                  <th className='sm:py-3 py-1.5 sm:px-6 px-2 text-left' role="columnheader" scope="col">
+            <table
+              className='min-w-full bg-gray-900 rounded-lg overflow-hidden  text-nowrap'
+              role='table'
+              aria-label={`Workout log for ${selectedDate.toDateString()}`}
+            >
+              <thead role='rowgroup'>
+                <tr
+                  className='bg-gray-950 text-gray-300 uppercase sm:text-sm text-xs leading-normal'
+                  role='row'
+                >
+                  <th
+                    className='sm:py-3 py-1.5 sm:px-6 px-2 text-left'
+                    role='columnheader'
+                    scope='col'
+                  >
                     Logged Exercise
                   </th>
-                  <th className='sm:py-3 py-1.5 sm:px-6 px-2 text-left' role="columnheader" scope="col">
+                  <th
+                    className='sm:py-3 py-1.5 sm:px-6 px-2 text-left'
+                    role='columnheader'
+                    scope='col'
+                  >
                     Sets
                   </th>
-                  <th className='sm:py-3 py-1.5 sm:px-6 px-2 text-left' role="columnheader" scope="col">
+                  <th
+                    className='sm:py-3 py-1.5 sm:px-6 px-2 text-left'
+                    role='columnheader'
+                    scope='col'
+                  >
                     Reps
                   </th>
-                  <th className='sm:py-3 py-1.5 sm:px-6 px-2 text-left' role="columnheader" scope="col">
+                  <th
+                    className='sm:py-3 py-1.5 sm:px-6 px-2 text-left'
+                    role='columnheader'
+                    scope='col'
+                  >
                     Weight (kg)
                   </th>
-                  <th className='sm:py-3 py-1.5 sm:px-6 px-2 text-left' role="columnheader" scope="col">
+                  <th
+                    className='sm:py-3 py-1.5 sm:px-6 px-2 text-left'
+                    role='columnheader'
+                    scope='col'
+                  >
                     Rest Time
                   </th>
-                  <th className='sm:py-3 py-1.5 sm:px-6 px-2 text-left' role="columnheader" scope="col">RPE</th>
-                  <th className='sm:py-3 py-1.5 sm:px-6 px-2 text-center' role="columnheader" scope="col">
+                  <th
+                    className='sm:py-3 py-1.5 sm:px-6 px-2 text-left'
+                    role='columnheader'
+                    scope='col'
+                  >
+                    RPE
+                  </th>
+                  <th
+                    className='sm:py-3 py-1.5 sm:px-6 px-2 text-center'
+                    role='columnheader'
+                    scope='col'
+                  >
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className='text-gray-200 sm:text-sm text-xs font-light' role="rowgroup">
+              <tbody
+                className='text-gray-200 sm:text-sm text-xs font-light'
+                role='rowgroup'
+              >
                 {exercises.map((exercise) => (
                   <React.Fragment key={exercise.id}>
                     {/* Exercise Header Row */}
-                    <tr className='bg-gray-900 border-b border-gray-600' role="row">
-                      <td className='sm:py-3 py-1.5 sm:px-6 px-2 text-left font-semibold text-blue-300 sm:text-base md:text-lg text-sm' role="cell" colSpan="6">
+                    <tr
+                      className='bg-gray-900 border-b border-gray-600'
+                      role='row'
+                    >
+                      <td
+                        className='sm:py-3 py-1.5 sm:px-6 px-2 text-left font-semibold text-blue-300 sm:text-base md:text-lg text-sm'
+                        role='cell'
+                        colSpan='6'
+                      >
                         {exercise.name}
                       </td>
-                      <td className='sm:py-3 py-1.5 sm:px-6 px-2 text-center' role="cell">
+                      <td
+                        className='sm:py-3 py-1.5 sm:px-6 px-2 text-center'
+                        role='cell'
+                      >
                         <button
                           onClick={() =>
                             handleDeleteExerciseClick(
@@ -398,27 +456,48 @@ export default function WorkoutLogPage({ selectedDate }) {
                       <tr
                         key={index}
                         className='bg-gray-800 border-b border-gray-700 last:border-b-0'
-                        role="row"
+                        role='row'
                       >
-                        <td className='sm:py-2 py-1 sm:px-6 px-2 text-left pl-10 italic' role="cell">
+                        <td
+                          className='sm:py-2 py-1 sm:px-6 px-2 text-left pl-10 italic'
+                          role='cell'
+                        >
                           Set {index + 1}:
                         </td>
-                        <td className='sm:py-2 py-1 sm:px-6 px-2 text-left' role="cell">
+                        <td
+                          className='sm:py-2 py-1 sm:px-6 px-2 text-left'
+                          role='cell'
+                        >
                           {/* Empty for sets */}
                         </td>
-                        <td className='sm:py-2 py-1 sm:px-6 px-2 text-left' role="cell">
+                        <td
+                          className='sm:py-2 py-1 sm:px-6 px-2 text-left'
+                          role='cell'
+                        >
                           {set.reps}
                         </td>
-                        <td className='sm:py-2 py-1 sm:px-6 px-2 text-left' role="cell">
+                        <td
+                          className='sm:py-2 py-1 sm:px-6 px-2 text-left'
+                          role='cell'
+                        >
                           {set.weight} kg
                         </td>
-                        <td className='sm:py-2 py-1 sm:px-6 px-2 text-left' role="cell">
+                        <td
+                          className='sm:py-2 py-1 sm:px-6 px-2 text-left'
+                          role='cell'
+                        >
                           {set.restTime}
                         </td>
-                        <td className='sm:py-2 py-1 sm:px-6 px-2 text-left' role="cell">
+                        <td
+                          className='sm:py-2 py-1 sm:px-6 px-2 text-left'
+                          role='cell'
+                        >
                           {set.rpe !== undefined ? set.rpe : '-'}
                         </td>
-                        <td className='sm:py-2 py-1 sm:px-6 px-2 text-center' role="cell">
+                        <td
+                          className='sm:py-2 py-1 sm:px-6 px-2 text-center'
+                          role='cell'
+                        >
                           {/* No action for individual sets here */}
                         </td>
                       </tr>
@@ -435,15 +514,21 @@ export default function WorkoutLogPage({ selectedDate }) {
         <button
           onClick={() => setCurrentPage(ROUTES.calendar)}
           className='px-6 py-3 bg-gray-900 text-gray-100 rounded-lg hover:bg-gray-700  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950'
-          aria-label="Back to calendar page"
+          aria-label='Back to calendar page'
         >
           ⬅️ Back to Calendar
         </button>
       </div>
 
       {showConfirmDeleteExerciseModal && (
-        <Modal onClose={() => setShowConfirmDeleteExerciseModal(false)} aria-labelledby="delete-exercise-modal-title">
-          <h3 id="delete-exercise-modal-title" className='text-xl font-bold text-red-400 mb-4 mr-[34px]'>
+        <Modal
+          onClose={() => setShowConfirmDeleteExerciseModal(false)}
+          aria-labelledby='delete-exercise-modal-title'
+        >
+          <h3
+            id='delete-exercise-modal-title'
+            className='text-xl font-bold text-red-400 mb-4 mr-[34px]'
+          >
             Confirm Deletion
           </h3>
           <p className='text-gray-200 mb-6'>
@@ -457,7 +542,7 @@ export default function WorkoutLogPage({ selectedDate }) {
             <button
               onClick={() => setShowConfirmDeleteExerciseModal(false)}
               className='px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-700 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 transition-colors'
-              aria-label="Cancel exercise deletion"
+              aria-label='Cancel exercise deletion'
             >
               Cancel
             </button>

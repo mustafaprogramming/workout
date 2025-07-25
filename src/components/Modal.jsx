@@ -32,7 +32,7 @@ export default function Modal({ children, onClose }) {
       <div
         ref={modalRef}
         tabIndex={-1}
-        className='bg-gray-900 p-3 sm:p-6 rounded-xl max-w-lg w-full h-fit relative text-gray-100 shadow-[5px_5px_0px_0px_#030712] border border-gray-950'
+        className='bg-gray-900 p-3 sm:p-6 rounded-md max-w-lg w-full h-fit relative text-gray-100 shadow-[5px_5px_0px_0px_#030712] border border-gray-950'
       >
         <button
           onClick={onClose}

@@ -3,27 +3,25 @@ import { useFirebase } from '../context/FirebaseContext'
 import { useState, useEffect } from 'react'
 import { formatDate } from '../util/utils'
 import { doc, setDoc, onSnapshot, collection } from 'firebase/firestore'
+import { deleteCloudinaryImage } from '../util/cloudinaryUtils' // Import deleteCloudinaryImage
+import { useMessage } from '../context/MessageContext'
 
 export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
-  const { db, userId, isAuthReady } = useFirebase() // Removed storage from context
-  const [measurements, setMeasurements] = useState({}) // { 'YYYY-MM-01': { data } }
+  const { db, userId, isAuthReady } = useFirebase()
+  const [measurements, setMeasurements] = useState({})
   const [showMeasurementModal, setShowMeasurementModal] = useState(false)
-  const [currentMonthData, setCurrentMonthData] = useState(null) // Data for the month being viewed/edited
-  const [message, setMessage] = useState('')
-  const [messageType, setMessageType] = useState('') // 'success' or 'error'
+  const [currentMonthData, setCurrentMonthData] = useState(null)
+  const {  setMessage, setMessageType } = useMessage()
   const [searchYear, setSearchYear] = useState(new Date().getFullYear())
-  const [searchMonth, setSearchMonth] = useState(new Date().getMonth() + 1) // 1-indexed month
-  const [highlightedMonth, setHighlightedMonth] = useState(null) // YYYY-MM-01 string for highlighting
+  const [searchMonth, setSearchMonth] = useState(new Date().getMonth() + 1)
+  const [highlightedMonth, setHighlightedMonth] = useState(null)
 
-  // Use a fixed app ID for Firestore path as __app_id is not available locally
   const appId =
-    import.meta.env.VITE_FIREBASE_APP_ID || 'workout-tracker-app-local' // Or any unique string for your local app
+    import.meta.env.VITE_FIREBASE_APP_ID || 'workout-tracker-app-local'
 
-  // Helper to check if measurement data is effectively empty
   const isEmptyMeasurementData = (data) => {
-    if (!data) return true // No data at all means empty
+    if (!data) return true
 
-    // Check numerical fields
     const numericFields = [
       'weight',
       'bodyFat',
@@ -38,7 +36,6 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
     ]
     const hasNumericData = numericFields.some((field) => {
       const value = data[field]
-      // Consider 0 as data if it's explicitly set, but empty string/null/undefined as empty
       return (
         value !== '' &&
         value !== null &&
@@ -47,10 +44,8 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
       )
     })
 
-    // Check notes
     const hasNotes = data.notes && data.notes.trim() !== ''
 
-    // Check image URLs
     const hasImageUrls =
       data.imageUrls &&
       data.imageUrls.some((img) => img.url && img.url.trim() !== '')
@@ -85,18 +80,16 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
   }, [db, userId, isAuthReady, appId])
 
   const handleMonthClick = (monthIndex) => {
-    // monthIndex is 0-indexed
     const date = new Date(selectedMonth.getFullYear(), monthIndex, 1)
     const today = new Date()
-    today.setDate(1) // Normalize to 1st of current month for comparison
+    today.setDate(1)
     today.setHours(0, 0, 0, 0)
 
-    // Disable interaction for future months
     if (date > today) {
       return
     }
 
-    const dateKey = formatDate(date) // YYYY-MM-01
+    const dateKey = formatDate(date)
 
     setCurrentMonthData(
       measurements[dateKey] || {
@@ -126,9 +119,9 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
       return
     }
     setSelectedMonth(newDate)
-    setHighlightedMonth(formatDate(newDate)) // Set highlight
+    setHighlightedMonth(formatDate(newDate))
     setTimeout(() => {
-      setHighlightedMonth(null) // Remove highlight after 10 seconds
+      setHighlightedMonth(null)
     }, 10000)
   }
 
@@ -141,20 +134,6 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
       <h2 className='sm:text-2xl text-xl font-bold text-blue-400 mb-6'>
         📏 Monthly Measurements
       </h2>
-
-      {message && (
-        <div
-          role='status'
-          aria-live='polite'
-          className={`p-3 mb-4 rounded-md text-center ${
-            messageType === 'success'
-              ? 'bg-green-800 text-green-200'
-              : 'bg-red-800 text-red-200'
-          }`}
-        >
-          {message}
-        </div>
-      )}
 
       <div className='flex justify-between items-center mb-6'>
         <button
@@ -245,7 +224,7 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
             measurements[monthKey]
           )
           const today = new Date()
-          today.setDate(1) // Normalize to 1st of current month for comparison
+          today.setDate(1)
           today.setHours(0, 0, 0, 0)
           const isFutureMonth = monthDate > today
           const isHighlighted = highlightedMonth === monthKey
@@ -268,7 +247,7 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
           return (
             <button
               key={monthName}
-              className={`p-1 sm:p-2 md:p-4 rounded-lg flex flex-col items-center justify-center transition-all duration-200 shadow-[5px_5px_0px_0px_#030712] border border-gray-950
+              className={`p-1 sm:p-2 md:p-4 rounded-lg flex flex-col items-center justify-center transition-all duration-200 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 hover:shadow-[0px_0px_0px_0px_#030712] hover:scale-105
                 ${
                   hasMeaningfulMeasurements
                     ? 'bg-green-700 hover:bg-green-600 '
@@ -306,14 +285,13 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
             const dateKey = formatDate(new Date(data.date))
             let savedLocally = false
 
-            // Start a timeout — if we don't hear back in 2 seconds, assume offline
             const fallbackTimeout = setTimeout(() => {
               if (!savedLocally) {
                 setShowMeasurementModal(false)
                 setMessage('Saved offline! Will sync later.')
                 setMessageType('success')
               }
-            }, 2000)
+            }, 5000)
 
             setDoc(
               doc(
@@ -338,17 +316,41 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
                 setMessageType('error')
               })
           }}
-          onClearData={async (dateKey) => { // Made onClearData async
+          onClearData={async (dateKey) => {
             let savedLocally = false
 
-            // Start a timeout — if we don't hear back in 2 seconds, assume offline
             const fallbackTimeout = setTimeout(() => {
               if (!savedLocally) {
                 setShowMeasurementModal(false)
                 setMessage('Saved offline! Will sync later.')
                 setMessageType('success')
               }
-            }, 2000)
+            }, 5000)
+
+            // --- NEW: Delete associated Cloudinary images for this month ---
+            const dataToClear = measurements[dateKey]
+            if (
+              dataToClear &&
+              dataToClear.imageUrls &&
+              dataToClear.imageUrls.length > 0
+            ) {
+              const deletePromises = dataToClear.imageUrls.map(async (img) => {
+                if (img.public_id) {
+                  try {
+                    await deleteCloudinaryImage(img.public_id)
+                    console.log(`Deleted Cloudinary image: ${img.public_id}`)
+                  } catch (e) {
+                    console.error(
+                      `Error deleting Cloudinary image ${img.public_id}:`,
+                      e
+                    )
+                    // Continue even if one image fails to delete
+                  }
+                }
+              })
+              await Promise.all(deletePromises) // Wait for all deletions to attempt
+            }
+            // --- END NEW ---
 
             setDoc(
               doc(
@@ -357,7 +359,7 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
                 dateKey
               ),
               {
-                date: dateKey, // Keep the date key
+                date: dateKey,
                 weight: '',
                 bodyFat: '',
                 chest: '',
@@ -369,10 +371,10 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
                 quads: '',
                 calves: '',
                 notes: '',
-                imageUrls: [], // Explicitly set to empty array
+                imageUrls: [],
               },
               { merge: false }
-            ) // Use merge: false to completely overwrite
+            )
               .then(() => {
                 savedLocally = true
                 clearTimeout(fallbackTimeout)

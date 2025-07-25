@@ -27,7 +27,7 @@ export default function Header() {
             strokeLinejoin='round'
           />
         </svg>
-        CoreTrack
+        FitTrack
       </h1>
 
       <span
@@ -35,7 +35,7 @@ export default function Header() {
         aria-label='App version 1.0.07'
       >
         <span className='text-xs sm:text-sm text-blue-300 font-bold'>v</span>
-        1.0.10
+        1.1.0
       </span>
     </header>
   )

@@ -9,10 +9,40 @@ import Header from './components/Header'
 import Nav from './components/Nav'
 import RenderPage from './components/RenderPage'
 import AppOfflineBanner from './components/AppOfflineBanner'
+import { MessageContextProvider, useMessage } from './context/MessageContext'
+import { useEffect, useState } from 'react'
 
 // Main App Component
 const AppContent = () => {
-  const { userId, isAuthReady } = useFirebase()
+  const { userId, isAuthReady, messagePopUpTime } = useFirebase()
+  const { message, messageType, setMessage, setMessageType } = useMessage()
+  const [closingMessage, setClosingMessage] = useState(true)
+  useEffect(() => {
+    if (closingMessage) {
+      const messageClose = setTimeout(() => {
+        setMessage('')
+        setMessageType('')
+      }, 300)
+      return () => {
+        clearTimeout(messageClose)
+      }
+    }
+  }, [closingMessage])
+  useEffect(() => {
+    if (!message || !messageType) {
+      setClosingMessage(true)
+      return
+    }
+
+    setClosingMessage(false)
+    const messageClose = setTimeout(() => {
+      setMessage('')
+    }, messagePopUpTime)
+
+    return () => {
+      clearTimeout(messageClose)
+    }
+  }, [message, messageType, messagePopUpTime])
 
   const {
     showMiniStopwatch,
@@ -53,7 +83,30 @@ const AppContent = () => {
       <AppOfflineBanner />
       <Header />
       {userId && <Nav />}
+      <div
+        role='status'
+        aria-live='polite'
+        className={`px-3 py-1.5 mb-4 rounded-md flex justify-between items-start fixed left-2/4 -translate-x-2/4  top-[50px] z-[1100] border border-gray-300 bg-opacity-65 backdrop-blur-md max-w-[90vw] lg:min-w-[40vw] md:min-w-[60vw] min-w-[80vw] text-wrap gap-3  text-sm sm:text-base duration-300 mr-5 ${
+          messageType === 'success'
+            ? 'bg-green-800 text-green-200'
+            : messageType === 'info'
+            ? 'bg-blue-800 text-blue-200'
+            : messageType === 'error'
+            ? 'bg-red-800 text-red-200'
+            : 'bg-red-800 text-red-200'
+        } ${!closingMessage ? 'scale-100' : 'scale-0'}`}
+      >
+        {message}
 
+        <button
+          className='text-gray-300 text-3xl ml-auto '
+          onClick={() => {
+            setClosingMessage(true)
+          }}
+        >
+          &times;
+        </button>
+      </div>
       <main className='p-2 sm:p-4'>{<RenderPage />}</main>
 
       {showMiniStopwatch && (
@@ -84,7 +137,9 @@ export default function App() {
     <FirebaseProvider>
       <TimerProvider>
         <NavigationProvider>
-          <AppContent />
+          <MessageContextProvider>
+            <AppContent />
+          </MessageContextProvider>
         </NavigationProvider>
       </TimerProvider>
     </FirebaseProvider>

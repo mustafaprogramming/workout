@@ -1,10 +1,11 @@
 import { useFirebase } from '../context/FirebaseContext'
 import { useState, useEffect } from 'react'
 import { formatDate } from '../util/utils'
-import { doc, setDoc, onSnapshot, collection  } from 'firebase/firestore'
+import { doc, setDoc, onSnapshot, collection } from 'firebase/firestore'
 import DayActionsModal from '../components/DayActionsModal'
 import { useNavigation } from '../context/NavigationContext'
 import { ROUTES } from '../route'
+import { useMessage } from '../context/MessageContext'
 
 export default function CalendarPage({ setSelectedDate }) {
   const { db, userId, isAuthReady, userCreatedAt } = useFirebase()
@@ -15,15 +16,15 @@ export default function CalendarPage({ setSelectedDate }) {
     workoutDaysOfWeek: [1, 2, 3, 4, 5], // Monday=1, Sunday=0
     restDaysOfWeek: [0, 6], // Sunday=0, Saturday=6
   })
-  const [message, setMessage] = useState('')
-  const [messageType, setMessageType] = useState('') // 'success' or 'error'
+  const { setMessage, setMessageType } = useMessage()
   const [showDayActionsModal, setShowDayActionsModal] = useState(false)
   const [selectedDayData, setSelectedDayData] = useState(null) // Data for the day clicked to open modal
   const [searchDate, setSearchDate] = useState('')
   const [highlightedDate, setHighlightedDate] = useState(null) // YYYY-MM-DD string for highlighting
 
   // Use a fixed app ID for Firestore path as __app_id is not available locally
-  const appId = import.meta.env.VITE_FIREBASE_APP_ID||'workout-tracker-app-local' // Or any unique string for your local app
+  const appId =
+    import.meta.env.VITE_FIREBASE_APP_ID || 'workout-tracker-app-local' // Or any unique string for your local app
 
   useEffect(() => {
     if (!db || !userId || !isAuthReady) return
@@ -204,7 +205,11 @@ export default function CalendarPage({ setSelectedDate }) {
     // Fill leading empty days
     for (let i = 0; i < firstDay; i++) {
       days.push(
-        <div key={`empty-${i}`} className='sm:p-2 p-1 text-center' aria-hidden="true"></div>
+        <div
+          key={`empty-${i}`}
+          className='sm:p-2 p-1 text-center'
+          aria-hidden='true'
+        ></div>
       )
     }
 
@@ -227,7 +232,12 @@ export default function CalendarPage({ setSelectedDate }) {
       let borderColor = 'border-gray-600'
       let textColor = 'text-gray-100'
       let statusEmoji = ''
-      let ariaDescription = `${date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`
+      let ariaDescription = `${date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })}.`
 
       const isFutureDate = date > today
       const isBeforeAccountCreation =
@@ -235,19 +245,20 @@ export default function CalendarPage({ setSelectedDate }) {
       const isToday = date.toDateString() === today.toDateString()
       const isHighlighted = highlightedDate === dateKey
 
-      let isDisabled = false;
+      let isDisabled = false
 
       if (isFutureDate || isBeforeAccountCreation) {
         bgColor = 'bg-gray-900'
         borderColor = 'border-gray-950'
         textColor = 'text-gray-600'
-        isDisabled = true;
+        isDisabled = true
         if (isFutureDate) {
           statusEmoji = '⏳'
           ariaDescription += ' This is a future date, no actions available.'
         } else {
           statusEmoji = '🚫'
-          ariaDescription += ' This date is before your account creation, no actions available.'
+          ariaDescription +=
+            ' This date is before your account creation, no actions available.'
         }
       } else {
         if (effectiveType === 'workout') {
@@ -273,7 +284,7 @@ export default function CalendarPage({ setSelectedDate }) {
       days.push(
         <button
           key={day}
-          className={`relative sm:p-3 p-1.5 border rounded-lg sm:shadow-[5px_5px_0px_0px_#030712] shadow-[2px_2px_0px_0px_#030712] flex flex-col items-center justify-center transition-all duration-200
+          className={`relative sm:p-3 p-1.5 border rounded-lg sm:shadow-[5px_5px_0px_0px_#030712] shadow-[2px_2px_0px_0px_#030712] hover:shadow-[0px_0px_0px_0px_#030712] flex flex-col items-center justify-center transition-all duration-200
             ${bgColor} ${borderColor} ${
             isDisabled
               ? 'cursor-not-allowed opacity-60'
@@ -285,11 +296,13 @@ export default function CalendarPage({ setSelectedDate }) {
           onClick={() => handleDayClick(day)}
           aria-label={ariaDescription}
           aria-disabled={isDisabled}
-          aria-current={isToday ? "date" : undefined}
+          aria-current={isToday ? 'date' : undefined}
           tabIndex={isDisabled ? -1 : 0}
         >
           <span className={`sm:text-lg font-bold ${textColor}`}>{day}</span>
-          <span className='text-sm sm:mt-1' aria-hidden="true">{statusEmoji}</span>
+          <span className='text-sm sm:mt-1' aria-hidden='true'>
+            {statusEmoji}
+          </span>
         </button>
       )
     }
@@ -304,20 +317,6 @@ export default function CalendarPage({ setSelectedDate }) {
         📅 Workout Calendar
       </h2>
 
-      {message && (
-        <div
-          role="status"
-          aria-live="polite"
-          className={`p-3 mb-4 rounded-md text-center ${
-            messageType === 'success'
-              ? 'bg-green-800 text-green-200'
-              : 'bg-red-800 text-red-200'
-          }`}
-        >
-          {message}
-        </div>
-      )}
-
       <div className='flex justify-between items-center mb-6'>
         <button
           onClick={() =>
@@ -330,14 +329,18 @@ export default function CalendarPage({ setSelectedDate }) {
             )
           }
           className='px-2 sm:px-4 py-1 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
-          aria-label={`Go to previous month, ${new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' })}`}
+          aria-label={`Go to previous month, ${new Date(
+            currentMonth.getFullYear(),
+            currentMonth.getMonth() - 1,
+            1
+          ).toLocaleString('default', { month: 'long', year: 'numeric' })}`}
         >
           Prev
         </button>
         <h3
           className='md:text-xl sm:text-lg font-semibold text-gray-200'
-          aria-live="polite"
-          aria-atomic="true"
+          aria-live='polite'
+          aria-atomic='true'
         >
           {currentMonth.toLocaleString('default', {
             month: 'long',
@@ -355,37 +358,46 @@ export default function CalendarPage({ setSelectedDate }) {
             )
           }
           className='px-2 sm:px-4 py-1 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
-          aria-label={`Go to next month, ${new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' })}`}
+          aria-label={`Go to next month, ${new Date(
+            currentMonth.getFullYear(),
+            currentMonth.getMonth() + 1,
+            1
+          ).toLocaleString('default', { month: 'long', year: 'numeric' })}`}
         >
           Next
         </button>
       </div>
 
       <div className='mb-6 flex gap-3'>
-        <label htmlFor="search-date-input" className="sr-only">Search for a specific date</label>
+        <label htmlFor='search-date-input' className='sr-only'>
+          Search for a specific date
+        </label>
         <input
-          id="search-date-input"
+          id='search-date-input'
           type='date'
           value={searchDate}
           onChange={(e) => setSearchDate(e.target.value)}
           className='flex-grow flex-1 p-1.5 sm:p-3 bg-gray-900 shadow-[4px_4px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
-          aria-label="Select a date to search"
+          aria-label='Select a date to search'
         />
         <button
           onClick={handleSearchDate}
           className='sm:px-4 px-2 py-1.5 sm:py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 text-xs sm:text-sm md:text-base'
-          aria-label="Go to selected date"
+          aria-label='Go to selected date'
         >
           🔍 Go to Date
         </button>
       </div>
 
-      <div className='grid grid-cols-7 sm:gap-3 gap-1 sm:mb-4 mb-2' role="rowgroup">
+      <div
+        className='grid grid-cols-7 sm:gap-3 gap-1 sm:mb-4 mb-2'
+        role='rowgroup'
+      >
         {daysOfWeek.map((day) => (
           <div
             key={day}
             className='sm:text-base text-sm font-semibold text-center text-gray-400'
-            role="columnheader"
+            role='columnheader'
             aria-label={`Day of week: ${day}`}
           >
             {day}
@@ -393,7 +405,7 @@ export default function CalendarPage({ setSelectedDate }) {
         ))}
       </div>
 
-      <div className='grid grid-cols-7 sm:gap-3 gap-1' role="grid">
+      <div className='grid grid-cols-7 sm:gap-3 gap-1' role='grid'>
         {renderDays()}
       </div>
 

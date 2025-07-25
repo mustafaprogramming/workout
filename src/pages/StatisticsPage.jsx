@@ -1,17 +1,23 @@
 import MeasurementData from '../components/MeasurementData'
 import { useFirebase } from '../context/FirebaseContext'
 import { useState, useEffect } from 'react'
-import { onSnapshot, collection  } from 'firebase/firestore'
+import { onSnapshot, collection } from 'firebase/firestore'
+import { useMessage } from '../context/MessageContext'
+import { useNavigation } from '../context/NavigationContext'
+import { ROUTES } from '../route'
 
-export default function StatisticsPage () {
+export default function StatisticsPage() {
   const { db, userId, isAuthReady } = useFirebase()
-  const [workoutStats, setWorkoutStats] = useState({}) // { year: { workoutDays, restDays } }
+  const { setCurrentPage } = useNavigation()
+  // --- UPDATED: workoutStats will now only track workoutDays ---
+  const [workoutStats, setWorkoutStats] = useState({}) // { year: { workoutDays } }
+  // --- END UPDATED ---
   const [measurements, setMeasurements] = useState([]) // Array of all measurements for display
-  const [message, setMessage] = useState('')
-  const [messageType, setMessageType] = useState('') // 'success' or 'error'
+  const { setMessage, setMessageType } = useMessage()
 
   // Use a fixed app ID for Firestore path as __app_id is not available locally
-  const appId = import.meta.env.VITE_FIREBASE_APP_ID||'workout-tracker-app-local' // Or any unique string for your local app
+  const appId =
+    import.meta.env.VITE_FIREBASE_APP_ID || 'workout-tracker-app-local' // Or any unique string for your local app
   // Helper to check if measurement data is effectively empty
   const isEmptyMeasurementData = (data) => {
     if (!data) return true // No data at all means empty
@@ -71,13 +77,12 @@ export default function StatisticsPage () {
           const dayType = data.type || 'rest' // Default to rest if not explicitly set
 
           if (!yearlyStats[year]) {
-            yearlyStats[year] = { workoutDays: 0, restDays: 0 }
+            // --- UPDATED: Initialize only workoutDays ---
+            yearlyStats[year] = { workoutDays: 0 }
           }
 
           if (dayType === 'workout' && hasWorkoutLogged) {
             yearlyStats[year].workoutDays++
-          } else {
-            yearlyStats[year].restDays++
           }
         })
         setWorkoutStats(yearlyStats)
@@ -132,20 +137,6 @@ export default function StatisticsPage () {
         📊 Statistics & Progress
       </h2>
 
-      {message && (
-        <div
-          role="status"
-          aria-live="polite"
-          className={`p-3 mb-4 rounded-md text-center ${
-            messageType === 'success'
-              ? 'bg-green-800 text-green-200'
-              : 'bg-red-800 text-red-200'
-          }`}
-        >
-          {message}
-        </div>
-      )}
-
       <section className='mb-8 bg-gray-900 border border-gray-950 shadow-[5px_5px_0px_0px_#030712] sm:p-4 p-2.5 rounded-lg '>
         <h3 className='sm:text-xl text-lg font-semibold text-gray-200 sm:mb-3 mb-1.5'>
           Yearly Workout Summary
@@ -153,33 +144,41 @@ export default function StatisticsPage () {
         {sortedYears.length === 0 ? (
           <p className='text-gray-400'>No workout data available yet.</p>
         ) : (
-          <div className='sm:space-y-3 space-y-1.5' role="list">
+          <div className='sm:space-y-3 space-y-1.5' role='list'>
+            <div className=' px-2 sm:px-3 rounded-md flex gap-2 justify-between items-center italic text-gray-400'>
+              <p className=''>Year</p>
+              <span className=''>
+                No of days worked out
+              </span>
+            </div>
             {sortedYears.map((year) => (
               <div
                 key={year}
-                className='bg-gray-800 shadow-[4px_4px_0px_0px_#030712] border border-gray-950 p-2 sm:p-3 rounded-md'
-                role="listitem"
+                className='bg-gray-800 shadow-[4px_4px_0px_0px_rgb(3, 7, 18)] border border-gray-950 p-2 sm:p-3 rounded-md flex gap-2 justify-between items-center'
+                role='listitem'
                 aria-label={`Workout summary for year ${year}`}
               >
-                <p className='text-lg font-bold text-blue-300'>Year: {year}</p>
-                <p className='text-gray-300'>
-                  Workout Days:
-                  <span className='font-bold text-green-400'>
-                    {workoutStats[year].workoutDays}
-                  </span>
+                <p className='text-lg font-bold text-blue-300 flex gap-2'>
+                  {year}
                 </p>
-                <p className='text-gray-300'>
-                  Rest Days:
-                  <span className='font-bold text-yellow-400'>
-                    {workoutStats[year].restDays}
-                  </span>
-                </p>
+                <span className='font-bold text-green-400'>
+                  {workoutStats[year].workoutDays}
+                </span>
               </div>
             ))}
           </div>
         )}
       </section>
-
+      {/* gallery button */}
+      <div className='mt-8 text-center'>
+        <button
+          onClick={() => setCurrentPage(ROUTES.galleryPage)}
+          className='px-6 py-3 w-full bg-gray-900 text-gray-100 rounded-lg hover:bg-gray-700  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 mb-6'
+          aria-label='Back to calendar page'
+        >
+          Visit Gallery 📸
+        </button>
+      </div>
       <section className='mb-6'>
         <h3 className='text-xl font-semibold text-gray-200 mb-3 '>
           Measurement History
@@ -187,9 +186,9 @@ export default function StatisticsPage () {
         {measurements.length === 0 ? (
           <p className='text-gray-400'>No measurements recorded yet.</p>
         ) : (
-          <div className='space-y-4' role="list">
+          <div className='space-y-4' role='list'>
             {measurements.map((m) => (
-              <MeasurementData key={m.id} m={m} role="listitem" />
+              <MeasurementData key={m.id} m={m} role='listitem' />
             ))}
           </div>
         )}

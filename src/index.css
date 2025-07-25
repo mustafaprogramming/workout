@@ -54,3 +54,17 @@ html {
 .overflow-y-scroll::-webkit-scrollbar-track {
   background: #111827;
 }
+.overflow-x-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #60a5fa #111827;
+}
+.overflow-x-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.overflow-x-scroll::-webkit-scrollbar-thumb {
+  background: #60a5fa;
+  border: 2px solid #111827;
+}
+.overflow-x-scroll::-webkit-scrollbar-track {
+  background: #111827;
+}
