@@ -32,7 +32,7 @@ export default function Header() {
 
       <span
         className='text-xs sm:text-sm text-gray-300 ml-auto'
-        aria-label='App version 1.0.07'
+        aria-label='App version 1.1.0'
       >
         <span className='text-xs sm:text-sm text-blue-300 font-bold'>v</span>
         1.1.0
