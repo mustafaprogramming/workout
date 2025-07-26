@@ -13,7 +13,7 @@ export default function RestTimerModal({ seconds, onClose }) {
     audioRef.current = new Audio(
       'https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg'
     )
-    audioRef.current.loop = false
+    audioRef.current.loop = true
 
     intervalRef.current = setInterval(() => {
       setRemaining((prev) => {
@@ -54,15 +54,12 @@ export default function RestTimerModal({ seconds, onClose }) {
           id='rest-timer-title'
           className='text-2xl font-bold mb-2 text-blue-400'
         >
-          ⏳ Rest Timer
+          {remaining === 0 ? "⏰ TIME'S UP!" : '⏳ Rest Timer'}
         </h2>
         <p className='text-4xl font-mono mb-4'>{formatTime(remaining)}</p>
-
-        {remaining === 0 ? (
-          <p className='mb-4 text-green-300'>✅ Time's up!</p>
-        ) : (
-          <p className='mb-4 text-gray-300'>Relax and recover.</p>
-        )}
+        <p className='mb-4 text-gray-300'>
+          {remaining === 0 ? 'Your timer has finished.' : 'Relax and recover.'}
+        </p>
 
         <button
           onClick={onClose}

@@ -12,7 +12,7 @@ export default function CalendarPage({ setSelectedDate }) {
   const { setCurrentPage } = useNavigation()
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [calendarData, setCalendarData] = useState({}) // { 'YYYY-MM-DD': { type: 'workout' | 'rest', exercises: [] } }
-  const [calendarSettings, setCalendarSettings] = useState({
+  const [settings, setSettings] = useState({
     workoutDaysOfWeek: [1, 2, 3, 4, 5], // Monday=1, Sunday=0
     restDaysOfWeek: [0, 6], // Sunday=0, Saturday=6
   })
@@ -22,29 +22,33 @@ export default function CalendarPage({ setSelectedDate }) {
   const [searchDate, setSearchDate] = useState('')
   const [highlightedDate, setHighlightedDate] = useState(null) // YYYY-MM-DD string for highlighting
 
-  // Use a fixed app ID for Firestore path as __app_id is not available locally
   const appId =
-    import.meta.env.VITE_FIREBASE_APP_ID || 'workout-tracker-app-local' // Or any unique string for your local app
+    import.meta.env.VITE_FIREBASE_APP_ID || 'workout-tracker-app-local'
 
   useEffect(() => {
     if (!db || !userId || !isAuthReady) return
 
-    // Fetch calendar settings
+    // Fetch general settings (including calendar preferences)
     const userSettingsDocRef = doc(
       db,
-      `artifacts/${appId}/users/${userId}/calendarSettings`,
-      'settings'
+      `artifacts/${appId}/users/${userId}/userSettings`,
+      'settings' // Path to the general settings document
     )
     const unsubscribeSettings = onSnapshot(
       userSettingsDocRef,
       (docSnap) => {
         if (docSnap.exists()) {
-          setCalendarSettings(docSnap.data())
+          const fetchedSettings = docSnap.data();
+          setSettings({
+            workoutDaysOfWeek: fetchedSettings.workoutDaysOfWeek || [1, 2, 3, 4, 5],
+            restDaysOfWeek: fetchedSettings.restDaysOfWeek || [0, 6],
+            // Other settings like popUpTime, lockProtectionEnabled are handled by FirebaseContext/SettingsPage
+          });
         } else {
-          // Set default settings if none exist
-          setDoc(userSettingsDocRef, calendarSettings, { merge: true }).catch(
-            (e) => console.error('Error setting default calendar settings:', e)
-          )
+          // --- OPTIMIZATION: Do NOT set default settings here. ---
+          // SettingsPage is responsible for creating the default 'settings' document.
+          // If it doesn't exist, CalendarPage will simply use its initial useState defaults.
+          console.log('CalendarPage: Settings document not found for user. Using local defaults.');
         }
       },
       (error) => {
@@ -84,7 +88,7 @@ export default function CalendarPage({ setSelectedDate }) {
       unsubscribeSettings()
       unsubscribeWorkouts()
     }
-  }, [db, userId, isAuthReady, appId])
+  }, [db, userId, isAuthReady, appId]) // Removed 'settings' from dependencies as it's set by Firestore
 
   const daysInMonth = (date) =>
     new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
@@ -93,10 +97,10 @@ export default function CalendarPage({ setSelectedDate }) {
 
   const getDayTypeFromSettings = (date) => {
     const dayOfWeek = date.getDay() // 0 for Sunday, 1 for Monday
-    if (calendarSettings.workoutDaysOfWeek.includes(dayOfWeek)) {
+    if (settings.workoutDaysOfWeek.includes(dayOfWeek)) {
       return 'workout'
     }
-    if (calendarSettings.restDaysOfWeek.includes(dayOfWeek)) {
+    if (settings.restDaysOfWeek.includes(dayOfWeek)) {
       return 'rest'
     }
     return 'none' // Neither planned workout nor rest, should ideally not happen if all days are covered
@@ -312,8 +316,8 @@ export default function CalendarPage({ setSelectedDate }) {
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
   return (
-    <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-6 p-3  rounded-xl  text-gray-100'>
-      <h2 className='sm:text-2xl text-xl font-bold text-blue-400 mb-6'>
+    <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-6 xs:p-3 p-2  rounded-xl  text-gray-100'>
+      <h2 className='sm:text-2xl text-xl font-bold text-blue-400 mb-6 mt-2'>
         📅 Workout Calendar
       </h2>
 

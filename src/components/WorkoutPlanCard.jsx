@@ -8,14 +8,12 @@ export default function WorkoutPlanCard({
   isEditing,
   onEditToggle, // Toggles editing for this specific plan
   onSaveExercises, // Renamed from onSave, specifically for exercises
-  onNameChange, // New prop: to update plan name
   onDeletePlan, // New prop: to delete the entire plan
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [editableExercises, setEditableExercises] = useState([])
   const [editablePlanName, setEditablePlanName] = useState(planName) // Local state for editing name
   const { setMessage, setMessageType } = useMessage()
-
   const cardRef = useRef(null)
 
   useEffect(() => {
@@ -128,7 +126,7 @@ export default function WorkoutPlanCard({
   return (
     <div
       ref={cardRef}
-      className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-2 sm:p-4 rounded-lg mb-3'
+      className='bg-gray-900 shadow-[2px_2px_0px_0px_#030712] xs:shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-2 sm:p-4 rounded-lg mb-3'
     >
       <div
         className='flex justify-between items-center cursor-pointer'
@@ -138,6 +136,7 @@ export default function WorkoutPlanCard({
           {isEditing ? (
             <input
               type='text'
+              id={`${planId}-name-input`}
               value={editablePlanName}
               onChange={(e) => setEditablePlanName(e.target.value)}
               className='w-full bg-gray-700 shadow-[2px_2px_0px_0px_#030712] border border-gray-950 rounded-md sm:p-2 p-1 text-gray-100'
@@ -277,7 +276,7 @@ export default function WorkoutPlanCard({
                               {isEditing ? (
                                 <input
                                   type='number'
-                                  placeholder='Weight (kg)'
+                                  placeholder='Weight'
                                   step='0.1'
                                   value={set.weight}
                                   onChange={(e) =>
@@ -318,7 +317,7 @@ export default function WorkoutPlanCard({
                               {isEditing ? (
                                 <input
                                   type='number'
-                                  placeholder='RPE (1-10)'
+                                  placeholder='RPE'
                                   min='1'
                                   max='10'
                                   value={set.rpe}

@@ -20,10 +20,8 @@ export const FirebaseProvider = ({ children }) => {
   const [isAuthReady, setIsAuthReady] = useState(false)
   const [userCreatedAt, setUserCreatedAt] = useState(null)
   const [messagePopUpTime, setMessagePopUpTime] = useState(5000) // Default to 5 seconds (in ms)
-  // --- NEW: State for lock protection ---
   const [lockProtectionEnabled, setLockProtectionEnabled] = useState(false)
   const [userEmail, setUserEmail] = useState(null) // To store the authenticated user's email
-  // --- END NEW ---
 
   useEffect(() => {
     if (!auth || !db) {
@@ -66,24 +64,27 @@ export const FirebaseProvider = ({ children }) => {
             )
           }
 
+          // --- UPDATED: Path changed from 'calendarSettings' to 'settings' ---
           const userSettingsDocRef = doc(
             db,
-            `artifacts/${APP_ID}/users/${user.uid}/calendarSettings`,
-            'settings'
+            `artifacts/${APP_ID}/users/${user.uid}/userSettings`,
+            'settings' // Now points to the general 'settings' document
           )
+          // --- END UPDATED ---
 
-          // Set up onSnapshot listener for calendar settings (to read popUpTime and lockProtectionEnabled)
+          // Set up onSnapshot listener for general settings
           unsubscribeSettings = onSnapshot(
             userSettingsDocRef,
             (settingsSnap) => {
               if (settingsSnap.exists()) {
                 const fetchedSettings = settingsSnap.data()
+                // Safely read popUpTime
                 if (typeof fetchedSettings.popUpTime === 'number') {
                   setMessagePopUpTime(fetchedSettings.popUpTime)
                 } else {
                   setMessagePopUpTime(5000) // Fallback to default if field is missing or invalid
                 }
-                // --- NEW: Read lockProtectionEnabled ---
+                // Safely read lockProtectionEnabled
                 if (
                   typeof fetchedSettings.lockProtectionEnabled === 'boolean'
                 ) {
@@ -93,22 +94,24 @@ export const FirebaseProvider = ({ children }) => {
                 } else {
                   setLockProtectionEnabled(false) // Default to false if missing or invalid
                 }
-                // --- END NEW ---
+                // Note: workoutDaysOfWeek/restDaysOfWeek are not read here, as they are handled by CalendarPage/SettingsPage
               } else {
-                setMessagePopUpTime(5000) // Reset to default if document doesn't exist
-                setLockProtectionEnabled(false) // Default to false if document doesn't exist
+                // If settings document doesn't exist, reset to defaults in context state
+                setMessagePopUpTime(5000)
+                setLockProtectionEnabled(false)
                 console.log(
-                  'FirebaseContext: Calendar settings document not found for user. NOT creating defaults here.'
+                  'FirebaseContext: Settings document not found for user. NOT creating defaults here.'
                 )
               }
             },
             (error) => {
               console.error(
-                'FirebaseContext: Error fetching real-time calendar settings:',
+                'FirebaseContext: Error fetching real-time settings:', // Updated log message
                 error
               )
-              setMessagePopUpTime(5000) // Fallback to default on error
-              setLockProtectionEnabled(false) // Fallback to default on error
+              // Fallback to defaults on error
+              setMessagePopUpTime(5000)
+              setLockProtectionEnabled(false)
             }
           )
         } else {

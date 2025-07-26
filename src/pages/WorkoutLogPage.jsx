@@ -190,8 +190,8 @@ export default function WorkoutLogPage({ selectedDate }) {
   }
 
   return (
-    <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-6 p-3 rounded-xl  text-gray-100 sm:text-base text-sm'>
-      <h2 className='sm:text-2xl text-lg font-bold text-blue-400 mb-4'>
+    <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-6 xs:p-3 p-2 rounded-xl  text-gray-100 sm:text-base text-sm'>
+      <h2 className='sm:text-2xl text-lg font-bold text-blue-400 mb-4 mt-2'>
         🏋️ Workout Log for {selectedDate.toDateString()}
       </h2>
 
@@ -527,13 +527,13 @@ export default function WorkoutLogPage({ selectedDate }) {
         >
           <h3
             id='delete-exercise-modal-title'
-            className='text-xl font-bold text-red-400 mb-4 mr-[34px]'
+            className='text-lg sm:text-xl font-bold text-red-400 mb-4 mr-[34px]'
           >
             Confirm Deletion
           </h3>
           <p className='text-gray-200 mb-6'>
             Are you sure you want to delete the exercise "
-            <span className='font-semibold text-blue-300'>
+            <span className='font-semibold text-sm sm:text-base text-blue-300'>
               {exerciseToDeleteName}
             </span>
             " from this workout log? This action cannot be undone.
@@ -541,14 +541,14 @@ export default function WorkoutLogPage({ selectedDate }) {
           <div className='flex justify-end space-x-3'>
             <button
               onClick={() => setShowConfirmDeleteExerciseModal(false)}
-              className='px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-700 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 transition-colors'
+              className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-gray-900 text-white rounded-md hover:bg-gray-700 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 transition-colors'
               aria-label='Cancel exercise deletion'
             >
               Cancel
             </button>
             <button
               onClick={confirmDeleteExercise}
-              className='px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
+              className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
               aria-label={`Confirm deletion of exercise ${exerciseToDeleteName}`}
             >
               Delete

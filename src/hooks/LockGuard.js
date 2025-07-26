@@ -7,13 +7,18 @@ export function useLockGuard({ isAuthReady, userId, lockProtectionEnabled }) {
 
   // Check unlock state on mount
   useEffect(() => {
-    if (!userId || !isAuthReady) return
+    if (!userId || !isAuthReady) {
+      setIsLocked(true)
+      localStorage.removeItem('appLastOpened')
+      sessionStarted = false
+      return
+    }
 
     if (!lockProtectionEnabled) {
       setIsLocked(false)
       return
     }
-
+    
     if (!sessionStarted) {
       sessionStarted = true
       const navEntry = performance.getEntriesByType('navigation')[0]

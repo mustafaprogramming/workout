@@ -24,15 +24,15 @@ export default function MeasurementData({ m }) {
     <div
       className={`bg-gray-900 ${
         showMeasurement ? '' : 'hover:shadow-[0px_0px_0px_0px_#030712]'
-      } shadow-[5px_5px_0px_0px_#030712] py-3 border border-gray-950 rounded-lg duration-500`}
+      } sm:shadow-[5px_5px_0px_0px_#030712] shadow-[2px_2px_0px_0px_#030712] py-1.5 xs:py-3 border border-gray-950 rounded-lg duration-500`}
     >
-      <div className='flex justify-between items-center'>
-        <p className='font-semibold text-blue-400 text-base sm:text-lg py-1 px-4 rounded-md bg-gray-900'>
+      <div className='flex justify-between items-center '>
+        <p className='font-semibold text-blue-400  text-sm xs:text-base sm:text-lg py-1 px-4 rounded-md bg-gray-900'>
           {m.date}
         </p>
         <button
           onClick={() => setShowMeasurement(!showMeasurement)}
-          className='bg-gray-950 hover:bg-[#030712ad] px-4 py-1 mr-3 rounded-md text-sm sm:text-base text-gray-400 shadow-[2px_2px_0px_0px_#030712] border border-gray-950'
+          className='bg-gray-950 hover:bg-[#030712ad] px-4 py-1 mr-3 rounded-md text-xs xs:text-sm sm:text-base text-gray-400 shadow-[2px_2px_0px_0px_#030712] border border-gray-950'
           aria-expanded={showMeasurement}
           aria-controls={`measurement-data-${m.date}`}
         >
@@ -46,72 +46,102 @@ export default function MeasurementData({ m }) {
       >
         {/* Measurement Table */}
         <div className='overflow-x-auto shadow-md'>
-          <table className='min-w-full bg-gray-800 overflow-hidden'>
+          <table className='min-w-full bg-gray-800 overflow-hidden text-xs sm:text-sm'>
             <thead>
-              <tr className='bg-gray-900 text-gray-300 uppercase text-sm leading-normal'>
-                <th className='py-3 px-6 text-left'>Measurement</th>
-                <th className='py-3 px-6 text-left'>Value</th>
+              <tr className='bg-gray-900 text-gray-300 uppercase  leading-normal'>
+                <th className='sm:py-3 sm:px-6 py-1.5 px-3 text-left'>
+                  Measurement
+                </th>
+                <th className='sm:py-3 sm:px-6 py-1.5 px-3 text-left'>Value</th>
               </tr>
             </thead>
-            <tbody className='text-gray-200 text-sm font-light'>
+            <tbody className='text-gray-200 font-light'>
               {m.weight && (
                 <tr className='border-b border-gray-500 last:border-b-0'>
-                  <td className='py-2 px-6 text-left'>Weight</td>
-                  <td className='py-2 px-6 text-left'>{m.weight} kg</td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>
+                    Weight
+                  </td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>
+                    {m.weight} kg
+                  </td>
                 </tr>
               )}
               {m.bodyFat && (
                 <tr className='border-b border-gray-500 last:border-b-0'>
-                  <td className='py-2 px-6 text-left'>Body Fat</td>
-                  <td className='py-2 px-6 text-left'>{m.bodyFat} %</td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>
+                    Body Fat
+                  </td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>
+                    {m.bodyFat} %
+                  </td>
                 </tr>
               )}
               {m.chest && (
                 <tr className='border-b border-gray-500 last:border-b-0'>
-                  <td className='py-2 px-6 text-left'>Chest</td>
-                  <td className='py-2 px-6 text-left'>{m.chest} in</td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>Chest</td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>
+                    {m.chest} in
+                  </td>
                 </tr>
               )}
               {m.waist && (
                 <tr className='border-b border-gray-500 last:border-b-0'>
-                  <td className='py-2 px-6 text-left'>Waist</td>
-                  <td className='py-2 px-6 text-left'>{m.waist} in</td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>Waist</td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>
+                    {m.waist} in
+                  </td>
                 </tr>
               )}
               {m.neck && (
                 <tr className='border-b border-gray-500 last:border-b-0'>
-                  <td className='py-2 px-6 text-left'>Neck</td>
-                  <td className='py-2 px-6 text-left'>{m.neck} in</td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>Neck</td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>
+                    {m.neck} in
+                  </td>
                 </tr>
               )}
               {m.forearms && (
                 <tr className='border-b border-gray-500 last:border-b-0'>
-                  <td className='py-2 px-6 text-left'>Forearms</td>
-                  <td className='py-2 px-6 text-left'>{m.forearms} in</td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>
+                    Forearms
+                  </td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>
+                    {m.forearms} in
+                  </td>
                 </tr>
               )}
               {m.bicep && (
                 <tr className='border-b border-gray-500 last:border-b-0'>
-                  <td className='py-2 px-6 text-left'>Bicep</td>
-                  <td className='py-2 px-6 text-left'>{m.bicep} in</td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>Bicep</td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>
+                    {m.bicep} in
+                  </td>
                 </tr>
               )}
               {m.hips && (
                 <tr className='border-b border-gray-500 last:border-b-0'>
-                  <td className='py-2 px-6 text-left'>Hips</td>
-                  <td className='py-2 px-6 text-left'>{m.hips} in</td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>Hips</td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>
+                    {m.hips} in
+                  </td>
                 </tr>
               )}
               {m.quads && (
                 <tr className='border-b border-gray-500 last:border-b-0'>
-                  <td className='py-2 px-6 text-left'>Quads</td>
-                  <td className='py-2 px-6 text-left'>{m.quads} in</td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>Quads</td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>
+                    {m.quads} in
+                  </td>
                 </tr>
               )}
               {m.calves && (
                 <tr className='border-b border-gray-500 last:border-b-0'>
-                  <td className='py-2 px-6 text-left'>Calves</td>
-                  <td className='py-2 px-6 text-left'>{m.calves} in</td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>
+                    Calves
+                  </td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>
+                    {m.calves} in
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -120,7 +150,7 @@ export default function MeasurementData({ m }) {
 
         {/* Notes */}
         {m.notes && (
-          <p className='text-sm text-gray-300 italic border-y border-gray-500 bg-gray-800 py-3 px-6'>
+          <p className='text-xs sm:text-sm text-gray-300 italic border-y border-gray-500 bg-gray-800 sm:py-3 sm:px-6 py-1.5 px-3'>
             Notes: {m.notes}
           </p>
         )}
@@ -138,8 +168,8 @@ export default function MeasurementData({ m }) {
         {m.imageUrls &&
           m.imageUrls.length > 0 &&
           m.imageUrls.find((img) => img.url !== '') && (
-            <div className='py-3 px-6'>
-              <h4 className='font-semibold text-gray-200 mb-4'>
+            <div className='sm:py-3 sm:px-6 py-1.5 px-3'>
+              <h4 className='font-semibold xs:text-base text-sm text-gray-200 mb-2 xs:mb-4'>
                 Physique Images:
               </h4>
               <div className='flex overflow-x-auto sm:gap-4 gap-2 pb-3'>
@@ -150,7 +180,7 @@ export default function MeasurementData({ m }) {
                         key={img.public_id || idx}
                         className='w-[120px] sm:w-[140px] md:w-[180px] 
                         flex-shrink-0  select-none  
-                    relative bg-gray-900 p-2 rounded-lg cursor-pointer border border-gray-700 hover:shadow-[0px_0px_0px_0px_#030712] shadow-[5px_5px_0px_0px_#030712] duration-500 overflow-hidden group'
+                    relative bg-[#16202f] sm:p-2 p-1 rounded-lg cursor-pointer border border-gray-700 hover:shadow-[0px_0px_0px_0px_#030712] shadow-[5px_5px_0px_0px_#030712] duration-500 overflow-hidden group'
                         role='button'
                         tabIndex={0}
                         onClick={() => handleImageClick(img.url, img.label)}
@@ -162,7 +192,7 @@ export default function MeasurementData({ m }) {
                         <img
                           src={img.url}
                           alt={img.label || `Physique image ${idx + 1}`}
-                          className='w-full h-[120px] sm:h-[140px] md:h-[180px] object-cover rounded-md mb-2 transition-transform duration-300 group-hover:scale-105'
+                          className='w-full h-[100px] xs:h-[120px] sm:h-[140px] md:h-[180px] object-cover rounded-md xs:mb-2 transition-transform duration-300 group-hover:scale-105'
                           onError={(e) => {
                             e.target.onerror = null
                             e.target.src =

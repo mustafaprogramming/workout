@@ -11,7 +11,7 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
   const [measurements, setMeasurements] = useState({})
   const [showMeasurementModal, setShowMeasurementModal] = useState(false)
   const [currentMonthData, setCurrentMonthData] = useState(null)
-  const {  setMessage, setMessageType } = useMessage()
+  const { setMessage, setMessageType } = useMessage()
   const [searchYear, setSearchYear] = useState(new Date().getFullYear())
   const [searchMonth, setSearchMonth] = useState(new Date().getMonth() + 1)
   const [highlightedMonth, setHighlightedMonth] = useState(null)
@@ -130,8 +130,8 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
   )
 
   return (
-    <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-6 p-3 rounded-xl  text-gray-100'>
-      <h2 className='sm:text-2xl text-xl font-bold text-blue-400 mb-6'>
+    <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-6 xs:p-3 p-2 rounded-xl  text-gray-100'>
+      <h2 className='sm:text-2xl text-xl font-bold text-blue-400 mb-6 mt-2'>
         📏 Monthly Measurements
       </h2>
 
@@ -247,7 +247,7 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
           return (
             <button
               key={monthName}
-              className={`p-1 sm:p-2 md:p-4 rounded-lg flex flex-col items-center justify-center transition-all duration-200 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 hover:shadow-[0px_0px_0px_0px_#030712] hover:scale-105
+              className={`p-1 sm:p-2 md:p-4 rounded-lg flex flex-col items-center justify-center transition-all duration-200 shadow-[3px_3px_0px_0px_#030712] xs:shadow-[5px_5px_0px_0px_#030712] border border-gray-950 hover:shadow-[0px_0px_0px_0px_#030712] hover:scale-105
                 ${
                   hasMeaningfulMeasurements
                     ? 'bg-green-700 hover:bg-green-600 '
@@ -305,9 +305,9 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
               .then(() => {
                 savedLocally = true
                 clearTimeout(fallbackTimeout)
+                setShowMeasurementModal(false)
                 setMessage('Measurement saved successfully!')
                 setMessageType('success')
-                setShowMeasurementModal(false)
               })
               .catch((e) => {
                 clearTimeout(fallbackTimeout)
@@ -316,6 +316,7 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
                 setMessageType('error')
               })
           }}
+          Clearable={!isEmptyMeasurementData(currentMonthData)}
           onClearData={async (dateKey) => {
             let savedLocally = false
 
@@ -338,10 +339,9 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
                 if (img.public_id) {
                   try {
                     await deleteCloudinaryImage(img.public_id)
-                    console.log(`Deleted Cloudinary image: ${img.public_id}`)
                   } catch (e) {
                     console.error(
-                      `Error deleting Cloudinary image ${img.public_id}:`,
+                      `Error deleting Cloudinary image:`,
                       e
                     )
                     // Continue even if one image fails to delete

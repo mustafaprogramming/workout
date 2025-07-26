@@ -1,7 +1,7 @@
 export default function Header() {
   return (
     <header
-      className='bg-gray-800 p-4 flex justify-start items-center rounded-b-3xl sticky z-[50] top-0 mx-4 sm:shadow-[0_10px_0px_0px_#030712] shadow-[0_5px_0px_0px_#030712] border border-gray-950'
+      className='bg-gray-800 p-4 flex justify-start items-center rounded-b-3xl sticky z-[50] top-0 mx-2 xs:mx-4 sm:shadow-[0_10px_0px_0px_#030712] shadow-[0_5px_0px_0px_#030712] border border-gray-950'
       role='banner'
     >
       <h1
@@ -35,7 +35,7 @@ export default function Header() {
         aria-label='App version 1.1.0'
       >
         <span className='text-xs sm:text-sm text-blue-300 font-bold'>v</span>
-        1.1.0
+        1.2.0
       </span>
     </header>
   )

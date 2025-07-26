@@ -132,11 +132,18 @@ export default function StatisticsPage() {
   )
 
   return (
-    <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-6 p-3 rounded-xl  text-gray-100'>
-      <h2 className=' sm:text-2xl text-xl font-bold text-blue-400 mb-6'>
+    <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-6 xs:p-3 p-2 rounded-xl  text-gray-100'>
+      <h2 className=' sm:text-2xl text-xl font-bold text-blue-400 mb-6 mt-2'>
         📊 Statistics & Progress
       </h2>
-
+      {/* gallery button */}
+      <button
+        onClick={() => setCurrentPage(ROUTES.galleryPage)}
+        className='px-6 py-3 w-full bg-gray-900 text-gray-100 rounded-lg hover:bg-gray-700  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 mb-6 text-center'
+        aria-label='Back to calendar page'
+      >
+        Visit Gallery 📸
+      </button>
       <section className='mb-8 bg-gray-900 border border-gray-950 shadow-[5px_5px_0px_0px_#030712] sm:p-4 p-2.5 rounded-lg '>
         <h3 className='sm:text-xl text-lg font-semibold text-gray-200 sm:mb-3 mb-1.5'>
           Yearly Workout Summary
@@ -145,11 +152,9 @@ export default function StatisticsPage() {
           <p className='text-gray-400'>No workout data available yet.</p>
         ) : (
           <div className='sm:space-y-3 space-y-1.5' role='list'>
-            <div className=' px-2 sm:px-3 rounded-md flex gap-2 justify-between items-center italic text-gray-400'>
+            <div className='sm:text-sm text-xs px-2 sm:px-3 rounded-md flex gap-2 justify-between items-center italic text-gray-400'>
               <p className=''>Year</p>
-              <span className=''>
-                No of days worked out
-              </span>
+              <span className=''>No of days worked out</span>
             </div>
             {sortedYears.map((year) => (
               <div
@@ -169,24 +174,19 @@ export default function StatisticsPage() {
           </div>
         )}
       </section>
-      {/* gallery button */}
-      <div className='mt-8 text-center'>
-        <button
-          onClick={() => setCurrentPage(ROUTES.galleryPage)}
-          className='px-6 py-3 w-full bg-gray-900 text-gray-100 rounded-lg hover:bg-gray-700  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 mb-6'
-          aria-label='Back to calendar page'
-        >
-          Visit Gallery 📸
-        </button>
-      </div>
-      <section className='mb-6'>
-        <h3 className='text-xl font-semibold text-gray-200 mb-3 '>
+      <section className='mb-6 bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-[2px] pt-2 sm:pt-4 rounded-lg '>
+        <h3 className='sm:text-xl md:text-2xl text-lg font-semibold text-gray-200 mb-3 px-2 sm:px-4'>
           Measurement History
         </h3>
         {measurements.length === 0 ? (
-          <p className='text-gray-400'>No measurements recorded yet.</p>
+          <p className='text-gray-300 bg-gray-700 shadow-[5px_5px_0px_0px_#030712]  border border-gray-950 p-1.5 xs:p-2 sm:p-4  rounded-md m-1 '>
+            No measurements recorded yet.
+          </p>
         ) : (
-          <div className='space-y-4' role='list'>
+          <div
+            className='space-y-2 sm:space-y-4 h-[40vh] xs:h-[50vh] sm:h-[60vh] md:h-[70vh] lg:h-[80vh] overflow-y-auto bg-gray-700 border border-gray-950 p-1 xs:p-2 sm:p-4  rounded-md  '
+            role='list'
+          >
             {measurements.map((m) => (
               <MeasurementData key={m.id} m={m} role='listitem' />
             ))}

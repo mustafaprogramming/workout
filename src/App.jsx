@@ -47,14 +47,14 @@ const AppContent = () => {
   const {
     showMiniStopwatch,
     setShowMiniStopwatch,
-    showMiniCountdown,
-    setShowMiniCountdown,
-    stopwatchTime,
     stopwatchIsRunning,
     setStopwatchIsRunning,
-    countdownTime,
+    stopwatchTime,
+    showMiniCountdown,
+    setShowMiniCountdown,
     countdownIsRunning,
     setCountdownIsRunning,
+    countdownTime,
     showAlarm,
     setShowAlarm,
   } = useTimer()
@@ -62,13 +62,10 @@ const AppContent = () => {
   if (!isAuthReady) {
     return (
       <div className='min-h-screen flex items-center justify-center bg-gray-900 text-gray-100 p-4'>
-        <div
-          className='bg-gray-800 p-8 rounded-lg shadow-[5px_5px_0px_0px_#030712] border border-gray-950 text-center'
-          role='status'
-          aria-live='polite'
-        >
-          <p className='text-lg font-semibold text-gray-200'>
-            Loading application...
+        <div className=' p-8  text-center' role='status' aria-live='polite'>
+          <p className="text-lg font-semibold text-gray-200  after:content-['.'] after:animate-dots ">
+            Loading application
+            <span className='sr-only'>loading</span>
           </p>
           <p className='text-sm text-gray-400 mt-2'>
             Initializing Firebase connection.
@@ -135,13 +132,13 @@ const AppContent = () => {
 export default function App() {
   return (
     <FirebaseProvider>
-      <TimerProvider>
-        <NavigationProvider>
-          <MessageContextProvider>
+      <MessageContextProvider>
+        <TimerProvider>
+          <NavigationProvider>
             <AppContent />
-          </MessageContextProvider>
-        </NavigationProvider>
-      </TimerProvider>
+          </NavigationProvider>
+        </TimerProvider>
+      </MessageContextProvider>
     </FirebaseProvider>
   )
 }

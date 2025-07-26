@@ -25,7 +25,7 @@ export default function SettingsPage() {
   const { stopTimers } = useTimer()
   const { setMessage, setMessageType } = useMessage()
 
-  const [calendarSettings, setCalendarSettings] = useState({
+  const [settings, setSettings] = useState({
     workoutDaysOfWeek: [1, 2, 3, 4, 5], // Monday=1, Sunday=0
     restDaysOfWeek: [0, 6], // Sunday=0, Saturday=6
     popUpTime: 5000, // Default for local state
@@ -63,28 +63,28 @@ export default function SettingsPage() {
       return
     }
 
+    // --- UPDATED: Path changed from 'calendarSettings' to 'settings' ---
     const userSettingsDocRef = doc(
       db,
-      `artifacts/${appId}/users/${userId}/calendarSettings`,
-      'settings'
+      `artifacts/${appId}/users/${userId}/userSettings`,
+      'settings' // Now points to the general 'settings' document
     )
+    // --- END UPDATED ---
 
     const unsubscribeSettings = onSnapshot(
       userSettingsDocRef,
       (docSnap) => {
-        // --- CRITICAL FIX: Check auth.currentUser here to prevent updates for deleted users ---
-        // This is the primary guard for the SettingsPage's own listener.
+        // CRITICAL FIX: Check auth.currentUser here to prevent updates for deleted users
         if (!auth.currentUser || auth.currentUser.uid !== userId) {
           console.log(
             'SettingsPage Snapshot: User changed or deleted. Skipping state update/creation.'
           )
           return
         }
-        // --- END CRITICAL FIX ---
 
         if (docSnap.exists()) {
           const fetchedSettings = docSnap.data()
-          setCalendarSettings({
+          setSettings({
             workoutDaysOfWeek: fetchedSettings.workoutDaysOfWeek || [
               1, 2, 3, 4, 5,
             ],
@@ -100,32 +100,32 @@ export default function SettingsPage() {
           })
         } else {
           // If settings document doesn't exist, create it with defaults here.
-          // This ensures it's created for new, authenticated users, or re-created if deleted.
-          const defaultCalendarSettings = {
+          const defaultSettings = {
+            // Renamed from defaultCalendarSettings
             workoutDaysOfWeek: [1, 2, 3, 4, 5],
             restDaysOfWeek: [0, 6],
             popUpTime: 5000,
             lockProtectionEnabled: false,
           }
           console.log(
-            `SettingsPage: Calendar settings document not found for user ${userId}. Creating defaults.`
+            `SettingsPage: settings document not found for user ${userId}. Creating defaults.`
           )
-          setDoc(userSettingsDocRef, defaultCalendarSettings, { merge: true })
+          setDoc(userSettingsDocRef, defaultSettings, { merge: true }) // Use defaultSettings
             .then(() => {
-              setCalendarSettings(defaultCalendarSettings)
-              setMessage('Default calendar settings created.')
+              setSettings(defaultSettings)
+              setMessage('Default settings created.')
               setMessageType('info')
             })
             .catch((e) => {
-              console.error('Error creating default calendar settings:', e)
+              console.error('Error creating default settings:', e)
               setMessage('Failed to create default settings.')
               setMessageType('error')
             })
         }
       },
       (error) => {
-        console.error('Error fetching calendar settings:', error)
-        setMessage('Error loading calendar settings.')
+        console.error('Error fetching settings:', error) // Updated log message
+        setMessage('Error loading settings.')
         setMessageType('error')
       }
     )
@@ -138,11 +138,12 @@ export default function SettingsPage() {
         unsubscribeSettings()
       }
     }
-  }, [db, userId, isAuthReady, appId, auth?.currentUser]) // Added auth?.currentUser to dependencies
+  }, [db, userId, isAuthReady, appId, auth?.currentUser])
+
   const setDeletionSpinnerShow = () => {
     setTimeout(() => {
       document.body.style.overflow = 'hidden'
-    }, 0)
+    }, 10)
     setDeletionSpinner(true)
   }
   const setDeletionSpinnerHide = () => {
@@ -152,55 +153,57 @@ export default function SettingsPage() {
   const setClearSpinnerShow = () => {
     setTimeout(() => {
       document.body.style.overflow = 'hidden'
-    }, 0)
+    }, 10)
     setClearSpinner(true)
   }
   const setClearSpinnerHide = () => {
     document.body.style.overflow = ''
     setClearSpinner(false)
   }
-  const saveSettings = () => {
-    if (editSettings) {
-      if (
-        calendarSettings.popUpTime < 1000 ||
-        calendarSettings.popUpTime > 30000
-      ) {
-        setCalendarSettings((prev) => ({
-          ...prev,
-          popUpTime: calendarSettings.popUpTime < 1000 ? 1000 : 30000,
-        }))
-        setMessage(
-          `Notification active time cannot be  ${
-            calendarSettings.popUpTime < 1000 ? 'less than 1' : 'more than 30'
-          } seconds `
-        )
-        setMessageType('error')
-        return
-      }
-      handleSaveSettings()
-    } else {
-      setEditSettings(!editSettings)
+
+  // --- OPTIMIZATION: Refined saveSettings logic ---
+  const saveSettings = async () => {
+    // Made async
+    if (!editSettings) {
+      setEditSettings(true) // If not in edit mode, switch to edit mode
+      return
     }
-  }
-  const handleSaveSettings = async () => {
+
+    // If in edit mode, validate and save
+    if (settings.popUpTime < 1000 || settings.popUpTime > 30000) {
+      setSettings((prev) => ({
+        ...prev,
+        popUpTime: settings.popUpTime < 1000 ? 1000 : 30000,
+      }))
+      setMessage(
+        `Notification active time cannot be ${
+          settings.popUpTime < 1000 ? 'less than 1' : 'more than 30'
+        } seconds`
+      )
+      setMessageType('error')
+      return
+    }
+
     if (!db || !userId) return
 
     const userSettingsDocRef = doc(
       db,
-      `artifacts/${appId}/users/${userId}/calendarSettings`,
+      `artifacts/${appId}/users/${userId}/userSettings`,
       'settings'
     )
     try {
-      await setDoc(userSettingsDocRef, calendarSettings, { merge: true })
+      await setDoc(userSettingsDocRef, settings, { merge: true })
       setMessage('Settings saved successfully!')
       setMessageType('success')
-      setEditSettings(!editSettings)
+      setEditSettings(false) // Exit edit mode after successful save
     } catch (e) {
       console.error('Error saving settings:', e)
       setMessage('Failed to save settings.')
       setMessageType('error')
     }
   }
+  // Removed handleSaveSettings as it's merged into saveSettings
+  // --- END OPTIMIZATION ---
 
   const handleSignOut = async () => {
     if (auth) {
@@ -257,9 +260,8 @@ export default function SettingsPage() {
       const deletePromises = publicIdsToDelete.map(async (publicId) => {
         try {
           await deleteCloudinaryImage(publicId)
-          console.log(`Deleted Cloudinary image: ${publicId}`)
         } catch (e) {
-          console.error(`Error deleting Cloudinary image ${publicId}:`, e)
+          console.error(`Error deleting Cloudinary image:`, e)
         }
       })
       await Promise.all(deletePromises)
@@ -286,14 +288,16 @@ export default function SettingsPage() {
 
       const batch = writeBatch(db)
 
+      // --- UPDATED: 'calendarSettings' changed to 'settings' ---
       const collectionsToClear = [
-        'calendarSettings',
+        'userSettings',
         'measurements',
         'userGalleryImages',
         'userProfile',
         'workoutPlans',
         'workouts',
       ]
+      // --- END UPDATED ---
 
       for (const collectionName of collectionsToClear) {
         const collectionRef = collection(
@@ -342,19 +346,17 @@ export default function SettingsPage() {
       return false
     }
 
-    // --- CRITICAL: Explicitly unsubscribe the SettingsPage's listener here ---
-    // This is vital to prevent it from reacting to the deletion and re-creating data.
+    // CRITICAL: Explicitly unsubscribe the SettingsPage's listener here
     if (typeof window.unsubscribeSettings === 'function') {
       try {
         window.unsubscribeSettings()
         console.log(
-          'SettingsPage: Unsubscribed from calendarSettings snapshot before deletion.'
+          'SettingsPage: Unsubscribed from settings snapshot before deletion.' // Updated log message
         )
       } catch (e) {
         console.error('SettingsPage: Failed to unsubscribe snapshot:', e)
       }
     }
-    // --- END CRITICAL ---
 
     setMessage('Finalizing data deletion...')
     setMessageType('info')
@@ -365,14 +367,16 @@ export default function SettingsPage() {
       await deleteAllUserCloudinaryImages()
 
       const batch = writeBatch(db)
+      // --- UPDATED: 'calendarSettings' changed to 'settings' ---
       const collectionsToDelete = [
-        'calendarSettings', // This will be deleted by the batch
+        'userSettings',
         'measurements',
         'userGalleryImages',
         'userProfile',
         'workoutPlans',
         'workouts',
       ]
+      // --- END UPDATED ---
 
       for (const collectionName of collectionsToDelete) {
         const collectionRef = collection(
@@ -421,15 +425,15 @@ export default function SettingsPage() {
 
     try {
       await reauthenticateWithCredential(auth.currentUser, credential)
-      console.log('User re-authenticated successfully.')
       setShowReauthModal(false)
+      setMessage('User re-authenticated successfully.')
+      setMessageType('success')
       setReauthPassword('')
       setDeletionSpinnerShow()
       const dataDeleted = await executeAccountAndDataDeletion()
       if (dataDeleted) {
-        // --- This is where the actual Firebase Auth user deletion happens ---
         await auth.currentUser.delete()
-        await signOut(auth) // Sign out after deletion to ensure state is clear
+        await signOut(auth)
         setMessage(
           'Account and all data deleted successfully! You have been signed out.'
         )
@@ -464,29 +468,25 @@ export default function SettingsPage() {
 
     setShowConfirmDeleteAccountModal(false)
     setShowReauthModal(true)
-    setMessage(
-      'For your security, please re-enter your password to confirm account deletion.'
-    )
-    setMessageType('info')
   }
 
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
   return (
-    <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-6 p-3 rounded-xl text-gray-100 select-none'>
-      <h2 className='sm:text-2xl text-xl font-bold text-blue-400 mb-6'>
+    <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-6 xs:p-3 p-2 rounded-xl text-gray-100 select-none'>
+      <h2 className='sm:text-2xl text-xl font-bold text-blue-400 mb-6 mt-2'>
         ⚙️ Settings
       </h2>
 
       <div className='mb-8 bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-2 sm:p-4 rounded-lg '>
-        <h3 className='sm:text-xl text-lg font-semibold text-gray-200 mb-2 sm:mb-3'>
+        <h3 className='sm:text-xl xs:text-lg text-base font-semibold text-gray-200 mb-2 sm:mb-3'>
           Calendar Preferences
         </h3>
         <fieldset className='mb-4'>
-          <label className='flex flex-col text-gray-300 font-semibold mb-2 '>
+          <label className='flex flex-col text-gray-300 font-semibold mb-2 xs:text-base text-sm '>
             <span>Workout Days:</span>
             <span
-              className='text-gray-400 italic text-xs sm:text-sm '
+              className='text-gray-400 italic text-xs xs:text-sm '
               aria-hidden='true'
             >
               Unmarked Days are Recorded as Rest Days
@@ -508,20 +508,16 @@ export default function SettingsPage() {
               >
                 <input
                   type='checkbox'
-                  checked={calendarSettings.workoutDaysOfWeek.includes(index)}
+                  checked={settings.workoutDaysOfWeek.includes(index)}
                   onChange={(e) => {
                     const newWorkDays = e.target.checked
-                      ? [...calendarSettings.workoutDaysOfWeek, index]
-                      : calendarSettings.workoutDaysOfWeek.filter(
-                          (d) => d !== index
-                        )
+                      ? [...settings.workoutDaysOfWeek, index]
+                      : settings.workoutDaysOfWeek.filter((d) => d !== index)
                     const newRestDays = e.target.checked
-                      ? calendarSettings.restDaysOfWeek.filter(
-                          (d) => d !== index
-                        )
-                      : [...calendarSettings.restDaysOfWeek, index]
+                      ? settings.restDaysOfWeek.filter((d) => d !== index)
+                      : [...settings.restDaysOfWeek, index]
 
-                    setCalendarSettings((prev) => ({
+                    setSettings((prev) => ({
                       ...prev,
                       restDaysOfWeek: newRestDays,
                       workoutDaysOfWeek: newWorkDays,
@@ -536,45 +532,54 @@ export default function SettingsPage() {
             ))}
           </div>
         </fieldset>
-        <div className='flex items-center justify-between w-full mt-10'>
-          <h3 className='sm:text-xl text-lg font-semibold text-gray-200 mb-2 sm:mb-3'>
-            Notification Active Time (sec) :
+        <fieldset className='my-4'>
+          <h3 className=' sm:text-xl text-base xs:text-lg font-semibold text-gray-200 mb-2 sm:mb-3'>
+            Notification Display Time (sec)
           </h3>
-          <input
-            type='number'
-            min={1}
-            max={30}
-            aria-label='pop up time'
-            value={calendarSettings.popUpTime / 1000} // Derive from calendarSettings
-            onChange={(e) =>
-              setCalendarSettings((prev) => ({
-                ...prev,
-                popUpTime: parseInt(e.target.value || '0') * 1000,
-              }))
-            } // Update calendarSettings directly
-            className={`p-1.5 sm:p-3 w-full  ${
-              editSettings ? 'bg-gray-700' : 'bg-gray-900'
-            } shadow-[5px_5px_0px_0px_#030712] border border-gray-950 ml-5 max-w-[200px] rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100`}
-            disabled={!editSettings}
-          />
-        </div>
-        <fieldset className='my-8'>
-          <h3 className='sm:text-xl text-lg font-semibold text-gray-200 mb-2 sm:mb-3'>
+          <div className='mb-4 flex items-center justify-between'>
+            <label
+              htmlFor='notification-time-input' // Changed htmlFor to be unique
+              className='flex-grow text-gray-400 font-semibold cursor-pointer italic xs:text-sm text-xs'
+            >
+              How Long Notifications Stay For On The Screen
+            </label>
+            <input
+              type='number'
+              min={1}
+              max={30}
+              id='notification-time-input' // Added id
+              aria-label='pop up time'
+              value={settings.popUpTime / 1000} // Derive from settings
+              onChange={(e) =>
+                setSettings((prev) => ({
+                  ...prev,
+                  popUpTime: parseInt(e.target.value || '0') * 1000,
+                }))
+              } // Update settings directly
+              className={`p-1.5 sm:p-3  ${
+                editSettings ? 'bg-gray-700' : 'bg-gray-900'
+              } shadow-[5px_5px_0px_0px_#030712] border border-gray-950 ml-5 max-w-[200px] rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100`}
+              disabled={!editSettings}
+            />
+          </div>
+        </fieldset>
+        <fieldset className='my-4'>
+          <h3 className=' sm:text-xl text-base xs:text-lg font-semibold text-gray-200 mb-2 sm:mb-3'>
             Security Settings
           </h3>
           <div className='mb-4 flex items-center justify-between'>
             <label
               htmlFor='lock-protection-toggle'
-              className='flex-grow text-gray-400 font-semibold cursor-pointer italic text-sm'
+              className='flex-grow text-gray-400 font-semibold cursor-pointer italic xs:text-sm text-xs'
             >
               Enable Lock Protection (Require password on app launch)
             </label>
             <input
               type='checkbox'
               id='lock-protection-toggle'
-              checked={calendarSettings.lockProtectionEnabled}
+              checked={settings.lockProtectionEnabled}
               onChange={(e) => {
-                setCalendarSettings((prev) => ({
+                setSettings((prev) => ({
                   ...prev,
                   lockProtectionEnabled: e.target.checked,
                 }))
@@ -596,9 +601,8 @@ export default function SettingsPage() {
           {editSettings ? 'Save Settings' : '✏️ Edit Settings'}
         </button>
       </div>
-      {/* --- END NEW --- */}
 
-      <div className='bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-4 rounded-lg flex flex-col gap-2 mb-8'>
+      <div className='bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-2 sm:p-4 rounded-lg flex flex-col gap-2 mb-8'>
         <h3 className='sm:text-xl text-lg font-semibold text-gray-200 mb-3'>
           Account Details
         </h3>
@@ -720,11 +724,11 @@ export default function SettingsPage() {
         >
           <h3
             id='clear-data-modal-title'
-            className='text-xl font-bold text-orange-400 mb-4 mr-[34px]'
+            className='text-lg sm:text-xl font-bold text-orange-400 mb-4 mr-[34px]'
           >
             Confirm Clear All Data
           </h3>
-          <p className='text-gray-200 mb-6'>
+          <p className='text-gray-200 mb-6 text-sm sm:text-base'>
             <span className='font-bold text-orange-300'>WARNING:</span> This
             action will permanently delete ALL your workout logs, measurements,
             and settings from the database. Your **user account will remain**,
@@ -733,20 +737,20 @@ export default function SettingsPage() {
             <br />
             Are you absolutely sure you want to proceed?
           </p>
-          <div className='flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3'>
+          <div className='flex gap-3'>
             <button
               onClick={() => setShowConfirmClearDataModal(false)}
-              className='px-2 py-1 sm:px-4 sm:py-2 bg-gray-900 text-white rounded-md hover:bg-gray-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
+              className='px-2 py-1 sm:px-4 text-sm sm:text-base sm:py-2 bg-gray-900 text-white rounded-md hover:bg-gray-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950 w-full text-nowrap'
               aria-label='Cancel data clearing'
             >
               Cancel
             </button>
             <button
               onClick={handleClearData}
-              className='px-2 py-1 sm:px-4 sm:py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 transition-colors'
+              className='px-2 py-1 sm:px-4 text-sm sm:text-base sm:py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 transition-colors w-full text-nowrap'
               aria-label='Confirm and clear all my data'
             >
-              Clear All My Data
+              Clear All Data
             </button>
           </div>
         </Modal>
@@ -759,11 +763,11 @@ export default function SettingsPage() {
         >
           <h3
             id='delete-account-modal-title'
-            className='text-xl font-bold text-red-400 mb-4 mr-[34px]'
+            className='text-lg sm:text-xl font-bold text-red-400 mb-4 mr-[34px]'
           >
             Confirm Account Deletion
           </h3>
-          <p className='text-gray-200 mb-6'>
+          <p className='text-gray-200 mb-6 text-sm sm:text-base'>
             <span className='font-bold text-red-300'>FINAL WARNING:</span> This
             action will permanently delete your **user account AND ALL** your
             workout logs, measurements, and settings. This cannot be undone.
@@ -771,20 +775,20 @@ export default function SettingsPage() {
             <br />
             Are you absolutely sure you want to proceed?
           </p>
-          <div className='flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3'>
+          <div className='flex  gap-3'>
             <button
               onClick={() => setShowConfirmDeleteAccountModal(false)}
-              className='px-2 py-1 sm:px-4 sm:py-2 bg-gray-900 text-white rounded-md hover:bg-gray-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
-              aria-label='Cancel account deletion'
+              className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-gray-900 text-white rounded-md hover:bg-gray-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950 w-full text-nowrap'
+              aria-label='Cancel account deletion '
             >
               Cancel
             </button>
             <button
               onClick={handleDeleteAccount} // This will now always trigger reauth flow
-              className='px-2 py-1 sm:px-4 sm:py-2 bg-red-800 text-white rounded-md hover:bg-red-900 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 transition-colors'
-              aria-label='Confirm and delete my account and all data'
+              className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-red-800 text-white rounded-md hover:bg-red-900 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 transition-colors w-full'
+              aria-label='Confirm and delete my account and all data text-nowrap'
             >
-              Delete My Account
+              Delete Account
             </button>
           </div>
         </Modal>
@@ -792,10 +796,10 @@ export default function SettingsPage() {
 
       {showReauthModal && (
         <Modal onClose={() => setShowReauthModal(false)}>
-          <h3 className='text-xl font-bold text-blue-400 mb-4 mr-[34px]'>
+          <h3 className='text-lg sm:text-xl font-bold text-blue-400 mb-4 mr-[34px]'>
             Re-authenticate for Security
           </h3>
-          <p className='text-gray-200 mb-2'>
+          <p className='text-gray-200 mb-2 text-sm sm:text-base'>
             For your security, please re-enter your password to confirm this
             sensitive action.
             <span className='mt-2 block'>
@@ -811,21 +815,21 @@ export default function SettingsPage() {
             placeholder='Your Password'
             value={reauthPassword}
             onChange={(e) => setReauthPassword(e.target.value)}
-            className='p-3 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 mb-4'
+            className='px-3 py-2 text-sm sm:text-base w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 mb-4'
           />
           {reauthError && (
             <p className='text-red-400 text-sm mb-4'>{reauthError}</p>
           )}
-          <div className='flex justify-end space-x-3'>
+          <div className='flex gap-3'>
             <button
               onClick={() => setShowReauthModal(false)}
-              className='px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
+              className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-gray-900 text-white rounded-md hover:bg-gray-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950 w-full text-nowrap'
             >
               Cancel
             </button>
             <button
               onClick={handleReauthenticate}
-              className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
+              className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950 w-full text-nowrap'
             >
               Confirm Re-authenticate
             </button>

@@ -14,9 +14,9 @@ export default function MeasurementModal({
   onClose,
   onSave,
   onClearData,
+  Clearable,
 }) {
   const { db, userId } = useFirebase()
-
   const appId =
     import.meta.env.VITE_FIREBASE_APP_ID || 'workout-tracker-app-local'
 
@@ -39,7 +39,7 @@ export default function MeasurementModal({
   const [showImagePreview, setShowImagePreview] = useState(false)
   const [previewImageUrl, setPreviewImageUrl] = useState('')
   const [previewImageLabel, setPreviewImageLabel] = useState('')
-  const { message, setMessage, setMessageType, messageType } = useMessage()
+  const { setMessage, setMessageType } = useMessage()
   const [showConfirmClearModal, setShowConfirmClearModal] = useState(false)
   const [uploadingOverall, setUploadingOverall] = useState(false)
 
@@ -97,19 +97,17 @@ export default function MeasurementModal({
     )
 
     let deletionSuccessfulFromCloudinary = false
+    setUploadingOverall(true)
 
     if (imageToRemove.public_id) {
       try {
         await deleteCloudinaryImage(imageToRemove.public_id)
-        console.log(
-          `Requested deletion for Cloudinary image: ${imageToRemove.public_id}`
-        )
         setMessage('Image deletion requested from Cloudinary.')
         setMessageType('success')
         deletionSuccessfulFromCloudinary = true
       } catch (e) {
         console.error(
-          `Error deleting Cloudinary image ${imageToRemove.public_id}:`,
+          `Error deleting Cloudinary image :`,
           e
         )
         setMessage('Failed to delete image from Cloudinary.')
@@ -128,14 +126,9 @@ export default function MeasurementModal({
 
     // Update local state immediately with the filtered array
     setFormData((prev) => {
-      // Ensure there's always at least one empty image field if all are removed
-      const finalImageUrls =
-        updatedImageUrlsLocally.length > 0
-          ? updatedImageUrlsLocally
-          : [{ url: '', label: '', file: null, uploading: false, progress: 0 }]
       return {
         ...prev,
-        imageUrls: finalImageUrls,
+        imageUrls: updatedImageUrlsLocally,
       }
     })
 
@@ -160,7 +153,7 @@ export default function MeasurementModal({
         )
 
         await setDoc(docRef, { imageUrls: imageUrlsToSave }, { merge: true }) // Merge to only update imageUrls
-        setMessage('Image list updated in database.') // More generic message
+        setMessage('Image list updated.') // More generic message
         setMessageType('success')
       } catch (e) {
         console.error('Error saving updated imageUrls to Firestore:', e)
@@ -169,6 +162,7 @@ export default function MeasurementModal({
       }
     }
     // --- END NEW ---
+    setUploadingOverall(false)
   }
 
   const handleImageClick = (url, label) => {
@@ -201,12 +195,28 @@ export default function MeasurementModal({
     { label: 'Quads (in)', key: 'quads', type: 'number', optional: false },
     { label: 'Calves (in)', key: 'calves', type: 'number', optional: false },
   ]
-
+  const handleCleardata = async () => {
+    setUploadingOverall(true)
+    setShowConfirmClearModal(false)
+    await onClearData(formData.date)
+    setUploadingOverall(false)
+  }
   const handleSaveClick = async () => {
     const requiredFields = measurementFields.filter((field) => !field.optional)
     for (const field of requiredFields) {
       if (!formData[field.key] || String(formData[field.key]).trim() === '') {
         setMessage(`Please enter a value for ${field.label}.`)
+        setMessageType('error')
+        return
+      }
+    }
+    const imageUrls = formData.imageUrls
+    for (const image of imageUrls) {
+      if (
+        (!image.label || String(image.label).trim() === '') &&
+        (image.url || String(image.url).trim() !== '')
+      ) {
+        setMessage(`Please enter label for image.`)
         setMessageType('error')
         return
       }
@@ -283,8 +293,6 @@ export default function MeasurementModal({
       }
 
       onSave(dataToSave)
-      setMessage('Measurement and images saved successfully!')
-      setMessageType('success')
 
       setFormData((prev) => ({ ...prev, imageUrls: finalImageUrlsToSave }))
     } catch (error) {
@@ -297,7 +305,7 @@ export default function MeasurementModal({
   }
 
   return (
-    <Modal onClose={onClose}>
+    <Modal onClose={onClose} disableClose={uploadingOverall}>
       <h3 className='text-lg sm:text-xl font-bold text-blue-400 mb-4 mr-[34px]'>
         Measurements for{' '}
         {new Date(formData.date).toLocaleString('default', {
@@ -438,17 +446,19 @@ export default function MeasurementModal({
           {formData.imageUrls.length < 10 && (
             <button
               onClick={handleAddImageField}
-              className='px-2 py-1 sm:px-4 sm:py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full text-sm sm:text-base'
+              className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full '
               disabled={uploadingOverall}
             >
-              ➕ Add Another Image
+              {formData.imageUrls.length > 0
+                ? '➕ Add Another Image'
+                : '➕ Add Image'}
             </button>
           )}
         </div>
 
         {formData.imageUrls.filter((img) => img.url).length > 0 && (
           <div className='mt-4'>
-            <h4 className='font-semibold text-gray-200 mb-2'>
+            <h4 className='font-semibold xs:text-base text-sm text-gray-200 mb-2 xs:mb-4'>
               Current Images:
             </h4>
             <div className='flex overflow-x-auto sm:gap-4 gap-2 pb-3'>
@@ -463,8 +473,9 @@ export default function MeasurementModal({
                     onKeyDown={(e) =>
                       handleImageKeyPress(e, img.url, img.label)
                     }
-                    className='w-[120px] sm:w-[140px] md:w-[180px] flex-shrink-0  select-none    
-                    relative bg-gray-900 p-2 rounded-lg cursor-pointer border border-gray-700 hover:shadow-[0px_0px_0px_0px_#030712] shadow-[5px_5px_0px_0px_#030712] duration-500 overflow-hidden group'
+                    className='w-[120px] sm:w-[140px] md:w-[180px] 
+                        flex-shrink-0  select-none  
+                    relative bg-[#16202f] sm:p-2 p-1 rounded-lg cursor-pointer border border-gray-700 hover:shadow-[0px_0px_0px_0px_#030712] shadow-[5px_5px_0px_0px_#030712] duration-500 overflow-hidden group'
                     aria-label={`Preview image: ${
                       img.label || `Physique Image ${idx + 1}`
                     }`}
@@ -472,7 +483,7 @@ export default function MeasurementModal({
                     <img
                       src={img.url}
                       alt={img.label || `Physique Image ${idx + 1}`}
-                      className='w-full h-[120px] sm:h-[140px] md:h-[180px]  object-cover rounded-md mb-2 transition-transform duration-300 group-hover:scale-105'
+                      className='w-full h-[100px] xs:h-[120px] sm:h-[140px] md:h-[180px] object-cover rounded-md xs:mb-2 transition-transform duration-300 group-hover:scale-105'
                       onError={(e) => {
                         e.target.onerror = null
                         e.target.src =
@@ -492,10 +503,14 @@ export default function MeasurementModal({
       </div>
 
       <div className='flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3 mt-6 pt-4 border-t border-gray-700'>
-        {Object.keys(monthData).length > 1 && (
+        {Clearable && (
           <button
             onClick={() => setShowConfirmClearModal(true)}
-            className='px-2 py-1 sm:px-4 sm:py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950'
+            className={`px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-orange-600 text-white rounded-md  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 ${
+              uploadingOverall
+                ? 'bg-orange-900'
+                : 'bg-orange-600 hover:bg-orange-700'
+            }`}
             disabled={uploadingOverall}
           >
             🧹 Clear Data
@@ -503,7 +518,11 @@ export default function MeasurementModal({
         )}
         <button
           onClick={handleSaveClick}
-          className='px-2 py-1 sm:px-4 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950'
+          className={`px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base  text-white rounded-md  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 ${
+            uploadingOverall
+              ? 'bg-green-900'
+              : 'bg-green-600 hover:bg-green-700'
+          }`}
           disabled={uploadingOverall}
         >
           {uploadingOverall ? 'Uploading...' : 'Save Measurement'}
@@ -520,10 +539,10 @@ export default function MeasurementModal({
 
       {showConfirmClearModal && (
         <Modal onClose={() => setShowConfirmClearModal(false)}>
-          <h3 className='text-xl font-bold text-blue-400 mb-4 mr-[34px]'>
+          <h3 className='text-lg sm:text-xl font-bold text-blue-400 mb-4 mr-[34px]'>
             Confirm Clear Data
           </h3>
-          <p className='text-gray-200 mb-6'>
+          <p className='text-gray-200 mb-6 text-sm sm:text-base'>
             Are you sure you want to clear all measurement data for this month?
             This will make it appear as "not logged" again, but the month entry
             itself will remain.
@@ -531,16 +550,15 @@ export default function MeasurementModal({
           <div className='flex justify-end space-x-3'>
             <button
               onClick={() => setShowConfirmClearModal(false)}
-              className='px-2 py-1 sm:px-4 sm:py-2 bg-gray-900 text-white rounded-md hover:bg-gray-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950'
+              className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-gray-900 text-white rounded-md hover:bg-gray-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950'
             >
               Cancel
             </button>
             <button
               onClick={() => {
-                onClearData(formData.date)
-                setShowConfirmClearModal(false)
+                handleCleardata()
               }}
-              className='px-2 py-1 sm:px-4 sm:py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950'
+              className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950'
             >
               Clear Data
             </button>

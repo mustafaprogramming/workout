@@ -85,10 +85,10 @@ export default function AuthPage() {
   }
 
   return (
-    <div className='flex items-center justify-center min-h-[calc(100vh-10rem)] p-2 sm:p-4'>
-      <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-4 sm:p-8 rounded-xl  w-full max-w-md text-gray-100'>
+    <div className='flex items-center justify-center min-h-[calc(100vh-10rem)] p-2 xs-p-4 sm:p-8'>
+      <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-3  xs:p-4 sm:p-8 rounded-xl  w-full max-w-md text-gray-100'>
         <h2
-          className='text-2xl  font-bold text-blue-400 mb-6 text-center'
+          className='text-2xl mt-4 font-bold text-blue-400 mb-6 text-center'
           style={{ textShadow: '3px 3px 0px rgba(0, 0, 0, 0.5)' }}
         >
           {isRegistering ? 'Register' : 'Login'}
@@ -96,7 +96,7 @@ export default function AuthPage() {
 
         
 
-        <div className='space-y-4 mb-6'>
+        <div className='space-y-2 sm:space-y-4 mb-6'>
           <input
             type='email'
             placeholder='Email'
@@ -105,7 +105,7 @@ export default function AuthPage() {
             aria-label='Email address'
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className='p-1.5 sm:p-3 w-full  bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950  rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
+            className='px-1.5 py-1 sm:p-3 w-full  bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950  rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 text-sm sm:text-base'
             disabled={loading}
           />
           <div className='relative'>
@@ -117,7 +117,7 @@ export default function AuthPage() {
               autoComplete='password'
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className='p-1.5 sm:p-3 w-full  bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950  rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 pr-10'
+              className='px-1.5 py-1 sm:p-3 w-full  bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950  rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 pr-10 text-sm sm:text-base'
               disabled={loading}
             />
             <button
@@ -126,7 +126,7 @@ export default function AuthPage() {
               onClick={() => setShowPassword(!showPassword)}
               className='absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-gray-400 hover:text-gray-200'
             >
-              {showPassword ? '🙈' : '👁️'}
+              {showPassword ? '🙈' : '👁️'} 
             </button>
           </div>
           {isRegistering && (
@@ -139,7 +139,7 @@ export default function AuthPage() {
                 aria-label='Confirm password'
                 autoComplete='password'
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className='p-1.5 sm:p-3 w-full bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 pr-10'
+                className='px-1.5 py-1 sm:p-3 w-full bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 pr-10 text-sm sm:text-base'
                 disabled={loading}
               />
               <button
@@ -157,13 +157,13 @@ export default function AuthPage() {
         <button
           onClick={handleAuthAction}
           aria-label={isRegistering ? 'Register account' : 'Login to account'}
-          className='w-full px-4 py-2 sm:py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[5px_5px_0px_0px_#030712] border border-gray-950 font-semibold'
+          className='w-full px-4 py-1 sm:py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[5px_5px_0px_0px_#030712] border border-gray-950 font-semibold text-sm sm:text-base'
           disabled={loading}
         >
           {loading ? 'Processing...' : isRegistering ? 'Register' : 'Login'}
         </button>
 
-        <p className='text-center text-gray-400 mt-4'>
+        <p className='text-center text-gray-400 text-sm sm:text-base my-4'>
           {isRegistering
             ? 'Already have an account? '
             : "Don't have an account? "}

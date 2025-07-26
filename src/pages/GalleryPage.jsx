@@ -1,3 +1,4 @@
+import { GalleryView } from '../components/GalleryView'
 import { useFirebase } from '../context/FirebaseContext'
 import { useState, useEffect, useMemo } from 'react' // Import useMemo for optimized filtering/sorting
 import {
@@ -7,6 +8,8 @@ import {
   addDoc, // For adding new gallery images
   deleteDoc, // For deleting gallery images
   doc, // For referencing specific documents
+  updateDoc,
+  getDoc, // NEW: Import updateDoc for updating image labels
 } from 'firebase/firestore'
 import { ImagePreviewModalGallery } from '../components/ImagePreviewModal'
 import { useMessage } from '../context/MessageContext'
@@ -14,28 +17,27 @@ import {
   uploadImageToCloudinary,
   deleteCloudinaryImage,
 } from '../util/cloudinaryUtils'
+import { ROUTES } from '../route'
+import { useNavigation } from '../context/NavigationContext'
 
 export default function GalleryPage() {
   const { db, userId, isAuthReady } = useFirebase()
   const { setMessage, setMessageType } = useMessage()
+  const { setCurrentPage } = useNavigation()
   const [galleryImages, setGalleryImages] = useState([]) // All fetched images
   const [loading, setLoading] = useState(true)
   const [showImagePreview, setShowImagePreview] = useState(false)
-  const [previewImageUrl, setPreviewImageUrl] = useState('')
-  const [previewImageLabel, setPreviewImageLabel] = useState('')
-  const [previewImageDate, setPreviewImageDate] = useState('')
-  const [previewImageId, setPreviewImageId] = useState(null)
-  const [previewImageSource, setPreviewImageSource] = useState(null)
+  // --- UPDATED: Store full image data for preview ---
+  const [previewImageData, setPreviewImageData] = useState(null) // Stores the full image object
+  // --- END UPDATED ---
   const [uploading, setUploading] = useState(false)
   const [fileToUpload, setFileToUpload] = useState(null)
   const [newImageLabel, setNewImageLabel] = useState('')
   const [previewFileUrl, setPreviewFileUrl] = useState(null)
 
-  // --- UPDATED: State for Search Type, Search Term, and Sort Order ---
   const [searchType, setSearchType] = useState('label') // 'label' or 'date'
   const [searchTerm, setSearchTerm] = useState('')
   const [sortOrder, setSortOrder] = useState('newest') // 'newest' or 'oldest'
-  // --- END UPDATED ---
 
   const appId =
     import.meta.env.VITE_FIREBASE_APP_ID || 'workout-tracker-app-local'
@@ -90,6 +92,12 @@ export default function GalleryPage() {
                   label: img.label || `Image from ${measurementDate}`,
                   date: measurementDate, // Store as YYYY-MM-DD string
                   source: 'measurement', // Identify source
+                  // --- NEW: Add document ID and array index for measurement images ---
+                  docId: doc.id, // The ID of the measurement document
+                  arrayIndex: data.imageUrls.findIndex(
+                    (item) => item.url === img.url
+                  ), // Index within imageUrls array
+                  // --- END NEW ---
                 })
               }
             })
@@ -145,7 +153,6 @@ export default function GalleryPage() {
     }
   }, [db, userId, isAuthReady, appId, setMessage, setMessageType])
 
-  // --- UPDATED: Memoized filtered and sorted images with searchType logic ---
   const filteredAndSortedImages = useMemo(() => {
     let filtered = galleryImages
 
@@ -156,11 +163,9 @@ export default function GalleryPage() {
         if (searchType === 'label') {
           return img.label.toLowerCase().includes(lowerCaseSearchTerm)
         } else if (searchType === 'date') {
-          // For date search, ensure the search term matches the YYYY-MM-DD format
-          // or a part of it (e.g., '2023-10' for October 2023)
           return img.date.includes(lowerCaseSearchTerm)
         }
-        return true // Should not happen
+        return true
       })
     }
 
@@ -178,16 +183,12 @@ export default function GalleryPage() {
 
     return sorted
   }, [galleryImages, searchType, searchTerm, sortOrder])
-  // --- END UPDATED ---
 
   const handleImageClick = (img) => {
-    const date = new Date(img.date).toLocaleDateString() // Format for display
-    setPreviewImageDate(date)
-    setPreviewImageUrl(img.url)
-    setPreviewImageLabel(img.label)
-    setPreviewImageId(img.id)
-    setPreviewImageSource(img.source)
+    // --- UPDATED: Store the entire image object ---
+    setPreviewImageData(img)
     setShowImagePreview(true)
+    // --- END UPDATED ---
   }
 
   const handleKeyPress = (e, img) => {
@@ -259,7 +260,7 @@ export default function GalleryPage() {
   }
 
   const handleDeleteGalleryImage = async () => {
-    if (!previewImageId || previewImageSource !== 'gallery') {
+    if (!previewImageData || previewImageData.source !== 'gallery') {
       setMessage(
         'Cannot delete this image. It is not a user-uploaded gallery image.'
       )
@@ -271,12 +272,12 @@ export default function GalleryPage() {
     setMessageType('info')
 
     try {
+      // Use previewImageData.id which is the Firestore doc ID for gallery images
       const imageToDelete = galleryImages.find(
-        (img) => img.id === previewImageId && img.source === 'gallery'
+        (img) => img.id === previewImageData.id && img.source === 'gallery'
       )
       if (imageToDelete && imageToDelete.public_id) {
         await deleteCloudinaryImage(imageToDelete.public_id)
-        console.log(`Deleted Cloudinary image: ${imageToDelete.public_id}`)
       } else {
         console.warn(
           'No public_id found for gallery image or image not found in state, skipping Cloudinary deletion.'
@@ -287,12 +288,14 @@ export default function GalleryPage() {
         doc(
           db,
           `artifacts/${appId}/users/${userId}/userGalleryImages`,
-          previewImageId
+          previewImageData.id
         )
       )
 
       setMessage('Image deleted from gallery successfully!')
       setMessageType('success')
+      setShowImagePreview(false) // Close modal after successful deletion
+      setPreviewImageData(null) // Clear preview data
     } catch (error) {
       console.error('Error deleting gallery image:', error)
       setMessage(`Failed to delete image: ${error.message}`)
@@ -300,9 +303,72 @@ export default function GalleryPage() {
     }
   }
 
+  // --- NEW: Function to handle updating image label ---
+  const handleEditImageLabel = async (imageToUpdate, newLabel) => {
+    if (!db || !userId || !imageToUpdate || !newLabel.trim()) {
+      setMessage('Invalid data for updating image label.', 'error')
+      setMessageType('error')
+      return
+    }
+
+    setMessage('Updating image label...', 'info')
+    setMessageType('info')
+
+    try {
+      if (imageToUpdate.source === 'gallery') {
+        // Update a document in 'userGalleryImages' collection
+        const imageDocRef = doc(
+          db,
+          `artifacts/${appId}/users/${userId}/userGalleryImages`,
+          imageToUpdate.id
+        )
+        await updateDoc(imageDocRef, { label: newLabel })
+        setMessage('Gallery image label updated successfully!', 'success')
+        setMessageType('success')
+      } else if (imageToUpdate.source === 'measurement') {
+        // Update an item within the 'imageUrls' array of a 'measurement' document
+        // This requires fetching the document, updating the array, and then saving the document.
+        const measurementDocRef = doc(
+          db,
+          `artifacts/${appId}/users/${userId}/measurements`,
+          imageToUpdate.docId // Use the stored measurement document ID
+        )
+        const measurementSnap = await getDoc(measurementDocRef)
+
+        if (measurementSnap.exists()) {
+          const measurementData = measurementSnap.data()
+          const updatedImageUrls = measurementData.imageUrls.map((img, idx) => {
+            if (idx === imageToUpdate.arrayIndex) {
+              // Match by index
+              return { ...img, label: newLabel }
+            }
+            return img
+          })
+          await updateDoc(measurementDocRef, { imageUrls: updatedImageUrls })
+          setMessage('Measurement image label updated successfully!', 'success')
+          setMessageType('success')
+        } else {
+          setMessage('Measurement document not found for image.', 'error')
+          setMessageType('error')
+        }
+      } else {
+        setMessage('Unknown image source, cannot update label.', 'error')
+        setMessageType('error')
+      }
+
+      // After successful update, update the preview data to reflect the change immediately
+      setPreviewImageData((prev) => ({ ...prev, label: newLabel }))
+    } catch (error) {
+      console.error('Error updating image label:', error)
+      setMessage(`Failed to update image label: ${error.message}`, 'error')
+      setMessageType('error')
+    }
+  }
+  // --- END NEW ---
+
   return (
-    <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-6 p-3 rounded-xl text-gray-100 min-h-[calc(100vh-120px)]'>
-      <h2 className='sm:text-2xl text-xl font-bold text-blue-400 mb-6'>
+    <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-6 xs:p-3 p-2 rounded-xl text-gray-100 min-h-[calc(100vh-120px)]'>
+      <h2 className='sm:text-2xl text-xl font-bold text-blue-400 mb-6 mt-2'>
         📸 Physique Gallery
       </h2>
 
@@ -315,7 +381,7 @@ export default function GalleryPage() {
           <div className='flex-grow '>
             <label
               htmlFor='image-upload'
-              className='block text-gray-300 text-sm font-semibold mb-1'
+              className='block text-gray-300 text-sm font-semibold mb-2 '
             >
               Select Image:
             </label>
@@ -328,7 +394,7 @@ export default function GalleryPage() {
                 />
                 <button
                   onClick={() => handleFileChange({ target: { files: [] } })}
-                  className='absolute top-0 right-0 bg-red-600 text-white  w-full h-full flex items-center justify-center text-3xl group-hover:opacity-70 opacity-0'
+                  className='absolute top-0 right-0 bg-red-600 text-white w-6 h-6 lg:w-full lg:h-full flex items-center justify-center rounded-bl-lg lg:rounded-none lg:text-3xl lg:group-hover:opacity-70 lg:opacity-0'
                   aria-label='Remove selected image preview'
                 >
                   &times;
@@ -341,7 +407,7 @@ export default function GalleryPage() {
                 accept='image/*'
                 onChange={handleFileChange}
                 className='block w-full text-sm text-gray-400
-                  file:mr-4 file:py-2 file:px-4
+                  file:mr-2 file:py-1 file:px-2 sm:file:mr-4 sm:file:py-2 sm:file:px-4
                   file:rounded-md file:border-0
                   file:text-sm file:font-semibold
                   file:bg-blue-500 file:text-white
@@ -364,34 +430,35 @@ export default function GalleryPage() {
               value={newImageLabel}
               onChange={(e) => setNewImageLabel(e.target.value)}
               placeholder='Enter image label'
-              className='w-full p-2 bg-gray-800 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 text-sm'
+              className='w-full p-1 sm:p-2 bg-gray-800 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 text-sm'
               disabled={uploading}
             />
           </div>
           <button
             onClick={handleUploadImage}
-            className='px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 flex-shrink-0'
+            className={`px-4 py-1 sm:py-2  text-white rounded-md  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 flex-shrink-0 text-sm ${uploading?' cursor-not-allowed bg-green-900':'hover:bg-green-700 bg-green-600'}`}
+            disabled={uploading}
           >
             {uploading ? 'Uploading...' : 'Upload Image'}
           </button>
         </div>
       </section>
 
-      {/* --- UPDATED: Search and Filter Section --- */}
+      {/* Search and Filter Section */}
       <section className='mb-8 bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-4 rounded-lg '>
         <h3 className='text-lg sm:text-xl font-semibold text-gray-200 mb-3'>
           Search & Filter Images
         </h3>
-        <div className='flex flex-col sm:flex-row gap-3 mb-4'>
+        <div className='flex flex-col sm:flex-row gap-1.5 sm:gap-3 mb-2 sm:mb-4'>
           {/* Search Input (conditional type) */}
           <input
             type={searchType === 'date' ? 'date' : 'text'}
             placeholder={
-              searchType === 'date' ? 'Select a date' : 'Search by label'
+              searchType === 'date' ? 'Select a date' : 'Enter label to Search'
             }
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className='flex-grow p-2 bg-gray-800 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 text-sm'
+            className='flex-grow p-1 px-2 sm:p-2 bg-gray-800 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 text-sm'
             aria-label={`Enter search term for ${searchType}`}
           />
           {/* Search Type Dropdown */}
@@ -401,7 +468,7 @@ export default function GalleryPage() {
               setSearchType(e.target.value)
               setSearchTerm('') // Clear search term when changing search type
             }}
-            className='p-2 bg-gray-800 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 text-sm sm:w-auto'
+            className='p-1 sm:p-2 bg-gray-800 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 text-sm sm:w-auto'
             aria-label='Select search type'
           >
             <option value='label'>Search by Label</option>
@@ -411,7 +478,7 @@ export default function GalleryPage() {
           <select
             value={sortOrder}
             onChange={(e) => setSortOrder(e.target.value)}
-            className='p-2 bg-gray-800 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 text-sm sm:w-auto'
+            className='p-1 sm:p-2 bg-gray-800 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 text-sm sm:w-auto'
             aria-label='Sort images by date'
           >
             <option value='newest'>Sort by Newest</option>
@@ -419,18 +486,24 @@ export default function GalleryPage() {
           </select>
         </div>
       </section>
-      {/* --- END UPDATED --- */}
 
       {loading && (
-        <p className='text-center text-gray-400'>Loading images...</p>
+        <p className='text-center text-gray-400 mb-[150px]'>
+          Loading images...
+        </p>
       )}
 
       {!loading &&
         filteredAndSortedImages.length === 0 &&
         searchTerm === '' && (
-          <p className='text-center text-gray-400'>
-            No physique images found yet. Add some from the{' '}
-            <span className='font-semibold text-blue-300'>Measurements</span>{' '}
+          <p className='text-center text-gray-400 mb-[150px]'>
+            No images found yet. Add some from the{' '}
+            <button
+              onClick={() => setCurrentPage(ROUTES.measurements)}
+              className='font-semibold text-blue-300'
+            >
+              Measurements
+            </button>{' '}
             tab or upload directly here!
           </p>
         )}
@@ -438,59 +511,35 @@ export default function GalleryPage() {
       {!loading &&
         filteredAndSortedImages.length === 0 &&
         searchTerm !== '' && (
-          <p className='text-center text-gray-400'>
+          <p className='text-center text-gray-400 mb-[150px]'>
             No images match your search term "{searchTerm}".
           </p>
         )}
 
       {!loading && filteredAndSortedImages.length > 0 && (
-        <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4'>
-          {filteredAndSortedImages.map(
-            (
-              img,
-              index // Use filteredAndSortedImages here
-            ) => (
-              <div
-                key={img.id || index}
-                role='button'
-                tabIndex={0}
-                onClick={() => handleImageClick(img)}
-                onKeyDown={(e) => handleKeyPress(e, img)}
-                className='relative bg-gray-900 p-2 rounded-lg cursor-pointer border border-gray-700 hover:shadow-[0px_0px_0px_0px_#030712] shadow-[5px_5px_0px_0px_#030712] duration-500 overflow-hidden group'
-                aria-label={`Open preview for ${img.label}`}
-              >
-                <img
-                  src={img.url}
-                  alt={img.label}
-                  className='w-full h-32 sm:h-40 object-cover rounded-md mb-2 transition-transform duration-300 group-hover:scale-105'
-                  onError={(e) => {
-                    e.target.onerror = null
-                    e.target.src =
-                      'https://placehold.co/300x200/4a5568/a0aec0?text=Image+Load+Error'
-                  }}
-                />
-                <p className='text-sm text-gray-300 font-semibold truncate'>
-                  {img.label}
-                </p>
-                <p className='text-xs text-gray-500'>
-                  {new Date(img.date).toLocaleDateString()}
-                </p>
-              </div>
-            )
-          )}
-        </div>
-      )}
-
-      {showImagePreview && (
-        <ImagePreviewModalGallery
-          imageDate={previewImageDate}
-          imageUrl={previewImageUrl}
-          imageLabel={previewImageLabel}
-          canDelete={previewImageSource === 'gallery'}
-          onDeleteImage={handleDeleteGalleryImage}
-          onClose={() => setShowImagePreview(false)}
+        <GalleryView
+          filteredAndSortedImages={filteredAndSortedImages}
+          handleImageClick={handleImageClick}
+          handleKeyPress={handleKeyPress}
         />
       )}
+
+      {showImagePreview &&
+        previewImageData && ( // Ensure previewImageData exists
+          <ImagePreviewModalGallery
+            imageDate={new Date(previewImageData.date).toLocaleDateString()} // Format date for display
+            imageUrl={previewImageData.url}
+            imageLabel={previewImageData.label}
+            canDelete={previewImageData.source === 'gallery'}
+            onDeleteImage={handleDeleteGalleryImage}
+            onClose={() => {
+              setShowImagePreview(false)
+              setPreviewImageData(null) // Clear preview data on close
+            }}
+            imageData={previewImageData} // Pass the full image data
+            onEditLabel={handleEditImageLabel} // Pass the new edit function
+          />
+        )}
     </div>
   )
 }

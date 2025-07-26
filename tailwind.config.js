@@ -9,6 +9,7 @@ export default {
       animation: {
         shake: 'shake 0.5s infinite',
         flash: 'flash 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        dots: 'dots 1.5s steps(3, end) infinite',
       },
       keyframes: {
         shake: {
@@ -18,7 +19,12 @@ export default {
         },
         flash: {
           '0%, 100%': { opacity: '1' },
-          '50%': { opacity: '0.6' },
+          '50%': { opacity: '0.7' },
+        },
+        dots: {
+          '0%, 20%': { content: "'.'" },
+          '40%': { content: "'..'" },
+          '60%, 100%': { content: "'...'" },
         },
       },
     },

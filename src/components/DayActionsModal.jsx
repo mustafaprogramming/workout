@@ -83,8 +83,8 @@ export default function DayActionsModal({
       </div>
 
       {effectiveType === 'workout' && hasWorkoutLogged && (
-        <div className='overflow-hidden rounded-lg mb-6 shadow-[5px_5px_0px_0px_#030712] border border-gray-950'>
-          <div className='bg-gray-800 rounded-lg shadow-inner max-h-[45vh] overflow-y-auto'>
+        <div className='overflow-hidden rounded-md mb-6 shadow-[5px_5px_0px_0px_#030712] border border-gray-950'>
+          <div className='bg-gray-800 rounded-md shadow-inner max-h-[45vh] overflow-y-auto'>
             {workoutDuration && (
               <p className='bg-gray-950 font-semibold flex gap-2 text-gray-300 text-md pb-3 pt-4 px-3'>
                 Duration:
@@ -162,7 +162,7 @@ export default function DayActionsModal({
           <button
             onClick={onLogWorkout}
             aria-label='Log workout for this day'
-            className='px-2 py-1 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full'
+            className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full'
           >
             📝 Log Workout
           </button>
@@ -177,7 +177,7 @@ export default function DayActionsModal({
               )
             }
             aria-label='Convert workout day to rest day'
-            className='px-2 py-1 sm:px-4 sm:py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full'
+            className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full'
           >
             🔄 Convert to Rest Day
           </button>
@@ -190,7 +190,7 @@ export default function DayActionsModal({
               )
             }
             aria-label='Convert rest day to workout day'
-            className='px-2 py-1 sm:px-4 sm:py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full'
+            className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full'
           >
             🔄 Convert to Workout Day
           </button>
@@ -207,21 +207,21 @@ export default function DayActionsModal({
           <h2
             id='confirm-title'
             ref={confirmTitleRef}
-            className='text-xl font-bold text-blue-400 mb-4 mr-[34px]'
+            className='text-lg sm:text-xl font-bold text-blue-400 mb-4 mr-[34px]'
           >
             Confirm Action
           </h2>
-          <p className='text-gray-200 mb-6'>{confirmMessage}</p>
+          <p className='text-gray-200 mb-6 text-sm sm:text-base'>{confirmMessage}</p>
           <div className='flex justify-end space-x-3'>
             <button
               onClick={() => setShowConfirmModal(false)}
-              className='px-2 py-1 sm:px-4 sm:py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950'
+              className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 '
             >
               Cancel
             </button>
             <button
               onClick={executeConfirmAction}
-              className='px-2 py-1 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow-[4px_4px_0px_0px_#030712] border border-gray-950 transition-colors'
+              className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow-[4px_4px_0px_0px_#030712] border border-gray-950 transition-colors '
             >
               Confirm
             </button>

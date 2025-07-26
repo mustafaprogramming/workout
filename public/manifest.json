@@ -1,11 +1,11 @@
 {
-  "name": "Core Tracker",
-  "short_name": "CoreTrack",
+  "name": "Fitness Tracker",
+  "short_name": "FitTrack",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#111827",
   "theme_color": "#1f2937",
-  "description": "Track workouts and no-fap progress offline!",
+  "description": "Track workouts progress!",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
