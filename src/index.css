@@ -68,3 +68,51 @@ html {
 .overflow-x-scroll::-webkit-scrollbar-track {
   background: #111827;
 }
+
+.animate-trash {
+  opacity: 0;
+  transform: scale(0);
+  offset-path: path('M 0 0 Q 68 -100 145 20');
+  offset-rotate: 0deg;
+  animation: moveAndFade 1.8s linear;
+}
+
+/* Keyframes for moving along the path, and then fading/scaling */
+@keyframes moveAndFade {
+  0% {
+    offset-rotate: 0deg;
+    offset-distance: 0%; /* Start of the path */
+    opacity: 0;
+    transform: scale(0); /* Ensure scale is 1 at the beginning */
+  }
+  20% {
+    offset-rotate: 0deg;
+    offset-distance: 0%; /* Start of the path */
+    opacity: 1;
+    transform: scale(1); /* Ensure scale is 1 at the beginning */
+  }
+  30% {
+    opacity: 1;
+    offset-distance: 10%;
+    offset-rotate: 10deg;
+  }
+  75%{
+    opacity: 1;
+    offset-distance: 55%;
+    offset-rotate: 45deg;
+  }
+  95% {
+    offset-rotate: 85deg;
+    offset-distance: 90%; /* Element reaches the end of the path */
+    opacity: 1;
+    transform: scale(
+      0.8
+    ); /* Maintain full opacity and scale just before the end */
+  }
+  100% {
+    offset-rotate: 95deg;
+    offset-distance: 100%; /* Still at the end of the path */
+    opacity: 0; /* Fade out */
+    transform: scale(0); /* Shrink */
+  }
+}

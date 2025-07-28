@@ -6,6 +6,15 @@ import { doc, setDoc, onSnapshot } from 'firebase/firestore'
 import { useNavigation } from '../context/NavigationContext'
 import { ROUTES } from '../route'
 import { useMessage } from '../context/MessageContext'
+//icon
+import {
+  FaBackward,
+  FaMinus,
+  FaPlus,
+  FaRegClock,
+  FaSave,
+  FaTrash,
+} from 'react-icons/fa'
 
 export default function WorkoutLogPage({ selectedDate }) {
   const { setCurrentPage } = useNavigation()
@@ -14,7 +23,7 @@ export default function WorkoutLogPage({ selectedDate }) {
   const [currentExerciseName, setCurrentExerciseName] = useState('')
   const [currentSets, setCurrentSets] = useState([]) // Array of { reps, weight, restTime, rpe } for the current exercise being added
   const [workoutDuration, setWorkoutDuration] = useState('') // New state for workout duration
-  const {  setMessage, setMessageType } = useMessage()
+  const { setMessage, setMessageType } = useMessage()
   const [showConfirmDeleteExerciseModal, setShowConfirmDeleteExerciseModal] =
     useState(false)
   const [exerciseToDeleteId, setExerciseToDeleteId] = useState(null)
@@ -196,8 +205,8 @@ export default function WorkoutLogPage({ selectedDate }) {
       </h2>
 
       <section className='mb-6 bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-4 p-2 rounded-lg '>
-        <h3 className='sm:text-xl text-base font-semibold text-gray-200 mb-3'>
-          Workout Details
+        <h3 className='sm:text-xl text-base font-semibold text-gray-200 mb-3 flex items-center gap-2'>
+          <FaRegClock /> Workout Duration
         </h3>
         <div className='flex flex-col sm:flex-row gap-3 mb-4'>
           <label htmlFor='workout-duration' className='sr-only'>
@@ -214,15 +223,15 @@ export default function WorkoutLogPage({ selectedDate }) {
           />
           <button
             onClick={handleSaveDuration}
-            className='px-2 py-1 sm:px-4 sm:py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950'
+            className='px-2 py-1 sm:px-4 sm:py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 flex items-center justify-center gap-2'
             aria-label='Save workout duration'
           >
-            Save Duration
+            <FaSave /> Save Duration
           </button>
         </div>
 
-        <h3 className='sm:text-xl text-base font-semibold text-gray-200 mb-3'>
-          Add New Exercise
+        <h3 className='sm:text-xl text-base font-semibold text-gray-200 mb-3 flex items-center gap-2'>
+          <FaPlus /> Add New Exercise
         </h3>
         <label htmlFor='exercise-name' className='sr-only'>
           Exercise Name
@@ -318,10 +327,10 @@ export default function WorkoutLogPage({ selectedDate }) {
                 />
                 <button
                   onClick={() => handleDeleteSet(index)}
-                  className='p-1 sm:p-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors  shadow-[2px_2px_0px_0px_#030712] border border-gray-950 mr-1'
+                  className='p-1 px-1.5 sm:px-3 sm:py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors  shadow-[2px_2px_0px_0px_#030712] border border-gray-950 mr-1'
                   aria-label={`Delete set ${index + 1}`}
                 >
-                  🗑️
+                  <FaMinus />
                 </button>
               </div>
             </div>
@@ -330,23 +339,23 @@ export default function WorkoutLogPage({ selectedDate }) {
 
         <button
           onClick={handleAddSet}
-          className='px-2 py-1 sm:px-4 sm:py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 mb-2 sm:mb-4 w-full'
+          className='px-2 py-1 sm:px-4 sm:py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 mb-2 sm:mb-4 w-full flex items-center justify-center gap-2'
           aria-label='Add a new set to the current exercise'
         >
-          ➕ Add Set
+          <FaPlus /> Add Set
         </button>
 
         <button
           onClick={handleAddExercise}
-          className='px-2 py-1 sm:px-4 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full'
+          className='px-2 py-1 sm:px-4 sm:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full flex items-center justify-center gap-2'
           aria-label='Add current exercise and its sets to the workout log'
         >
-          Add Exercise to Log
+          <FaSave /> Save Exercise to Log
         </button>
       </section>
 
-      <section className='mb-6 overflow-hidden rounded-lg  shadow-[5px_5px_0px_0px_#030712] border border-gray-950'>
-        <h3 className='sr-only'>Logged Exercises</h3>{' '}
+      <section className='mb-6 overflow-hidden rounded-lg  shadow-[5px_5px_0px_0px_#030712] border border-gray-950 '>
+        <h3 className='sr-only '>Logged Exercises</h3>{' '}
         {/* Visually hidden heading for table context */}
         {exercises.length === 0 ? (
           <p className='text-gray-400 p-2'>
@@ -365,7 +374,7 @@ export default function WorkoutLogPage({ selectedDate }) {
                   role='row'
                 >
                   <th
-                    className='sm:py-3 py-1.5 sm:px-6 px-2 text-left'
+                    className='sm:py-3 py-1.5 sm:px-6 px-2 text-left '
                     role='columnheader'
                     scope='col'
                   >
@@ -444,10 +453,10 @@ export default function WorkoutLogPage({ selectedDate }) {
                               exercise.name
                             )
                           }
-                          className='px-3 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-[2px_2px_0px_0px_#030712] border border-gray-950 text-xs'
+                          className='px-3 py-1.5 bg-red-600 text-white hover:text-gray-300 rounded-md hover:bg-red-700 transition-colors shadow-[2px_2px_0px_0px_#030712] border border-gray-950 text-xs'
                           aria-label={`Delete exercise ${exercise.name}`}
                         >
-                          Delete
+                          <FaTrash />
                         </button>
                       </td>
                     </tr>
@@ -510,15 +519,13 @@ export default function WorkoutLogPage({ selectedDate }) {
         )}
       </section>
 
-      <div className='mt-8 text-center'>
-        <button
-          onClick={() => setCurrentPage(ROUTES.calendar)}
-          className='px-6 py-3 bg-gray-900 text-gray-100 rounded-lg hover:bg-gray-700  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950'
-          aria-label='Back to calendar page'
-        >
-          ⬅️ Back to Calendar
-        </button>
-      </div>
+      <button
+        onClick={() => setCurrentPage(ROUTES.calendar)}
+        className='px-6 py-3 bg-gray-900 text-gray-100 rounded-lg hover:bg-gray-700  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 flex gap-2 items-center justify-center mx-auto mb-6'
+        aria-label='Back to calendar page'
+      >
+        <FaBackward /> Back to Calendar
+      </button>
 
       {showConfirmDeleteExerciseModal && (
         <Modal

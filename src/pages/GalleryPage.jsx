@@ -19,6 +19,7 @@ import {
 } from '../util/cloudinaryUtils'
 import { ROUTES } from '../route'
 import { useNavigation } from '../context/NavigationContext'
+import { FaTimes, FaUpload } from 'react-icons/fa'
 
 export default function GalleryPage() {
   const { db, userId, isAuthReady } = useFirebase()
@@ -394,10 +395,11 @@ export default function GalleryPage() {
                 />
                 <button
                   onClick={() => handleFileChange({ target: { files: [] } })}
-                  className='absolute top-0 right-0 bg-red-600 text-white w-6 h-6 lg:w-full lg:h-full flex items-center justify-center rounded-bl-lg lg:rounded-none lg:text-3xl lg:group-hover:opacity-70 lg:opacity-0'
+                  className={`absolute top-0 right-0 bg-red-600 text-white w-6 h-6 lg:w-full lg:h-full flex items-center justify-center rounded-bl-lg lg:rounded-none lg:text-3xl lg:group-hover:opacity-70 lg:opacity-0 ${uploading&&'cursor-not-allowed'}`}
                   aria-label='Remove selected image preview'
+                  disabled={uploading}
                 >
-                  &times;
+                  <FaTimes/>
                 </button>
               </div>
             ) : (
@@ -436,10 +438,24 @@ export default function GalleryPage() {
           </div>
           <button
             onClick={handleUploadImage}
-            className={`px-4 py-1 sm:py-2  text-white rounded-md  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 flex-shrink-0 text-sm ${uploading?' cursor-not-allowed bg-green-900':'hover:bg-green-700 bg-green-600'}`}
+            className={`px-4 py-1 sm:py-2  text-white rounded-md  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 flex-shrink-0 text-sm ${
+              uploading
+                ? ' cursor-not-allowed bg-green-900'
+                : 'hover:bg-green-700 bg-green-600'
+            }`}
             disabled={uploading}
           >
-            {uploading ? 'Uploading...' : 'Upload Image'}
+            {uploading ? (
+              <span className='items-center flex gap-2 justify-center'>
+                Uploading
+                <span className='flex animate-spin w-4 h-4 border-2 border-t-transparent border-gray-300 rounded-full'></span>
+              </span>
+            ) : (
+              <span className='items-center flex gap-2 justify-center'>
+                <FaUpload />
+                Upload Image
+              </span>
+            )}
           </button>
         </div>
       </section>

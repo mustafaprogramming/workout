@@ -11,6 +11,9 @@ import RenderPage from './components/RenderPage'
 import AppOfflineBanner from './components/AppOfflineBanner'
 import { MessageContextProvider, useMessage } from './context/MessageContext'
 import { useEffect, useState } from 'react'
+import { FaTimes } from 'react-icons/fa'
+
+
 
 // Main App Component
 const AppContent = () => {
@@ -38,7 +41,7 @@ const AppContent = () => {
     const messageClose = setTimeout(() => {
       setMessage('')
     }, messagePopUpTime)
-
+    
     return () => {
       clearTimeout(messageClose)
     }
@@ -58,7 +61,7 @@ const AppContent = () => {
     showAlarm,
     setShowAlarm,
   } = useTimer()
-
+  
   if (!isAuthReady) {
     return (
       <div className='min-h-screen flex items-center justify-center bg-gray-900 text-gray-100 p-4'>
@@ -74,7 +77,7 @@ const AppContent = () => {
       </div>
     )
   }
-
+  
   return (
     <div className='min-h-screen bg-gray-900 text-gray-100 font-inter'>
       <AppOfflineBanner />
@@ -83,7 +86,7 @@ const AppContent = () => {
       <div
         role='status'
         aria-live='polite'
-        className={`px-3 py-1.5 mb-4 rounded-md flex justify-between items-start fixed left-2/4 -translate-x-2/4  top-[50px] z-[1100] border border-gray-300 bg-opacity-65 backdrop-blur-md max-w-[90vw] lg:min-w-[40vw] md:min-w-[60vw] min-w-[80vw] text-wrap gap-3  text-sm sm:text-base duration-300 mr-5 ${
+        className={`pr-2 ps-3 py-1.5 mb-4 rounded-md flex justify-between items-start fixed left-2/4 -translate-x-2/4  top-[50px] z-[1100] border border-gray-300 bg-opacity-65 backdrop-blur-md max-w-[90vw] lg:min-w-[40vw] md:min-w-[60vw] min-w-[80vw] text-wrap gap-3  text-sm sm:text-base duration-300 mr-5 ${
           messageType === 'success'
             ? 'bg-green-800 text-green-200'
             : messageType === 'info'
@@ -96,16 +99,15 @@ const AppContent = () => {
         {message}
 
         <button
-          className='text-gray-300 text-3xl ml-auto '
+          className='text-gray-300 text-lg ml-auto w-fit h-fit'
           onClick={() => {
             setClosingMessage(true)
           }}
         >
-          &times;
+          <FaTimes />
         </button>
       </div>
       <main className='p-2 sm:p-4'>{<RenderPage />}</main>
-
       {showMiniStopwatch && (
         <FloatingTimer
           type='stopwatch'

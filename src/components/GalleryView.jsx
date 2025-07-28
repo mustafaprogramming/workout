@@ -54,10 +54,10 @@ export function GalleryView({
             }}
             style={{ height: `${imageSize - 10}px` }}
           />
-          <p className=' xs:text-xs text-[9px] text-gray-300 font-semibold truncate'>
+          <p className=' xs:text-xs text-[10px] text-gray-300 font-semibold truncate'>
             {img.label}
           </p>
-          <p className=' xs:text-[10px] text-[7px] text-gray-500'>
+          <p className=' xs:text-[10px] text-[8px] text-gray-500 truncate'>
             {new Date(img.date).toLocaleDateString()}
           </p>
         </div>

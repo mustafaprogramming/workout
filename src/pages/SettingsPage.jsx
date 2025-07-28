@@ -19,6 +19,19 @@ import { useTimer } from '../context/TimerContext'
 import { copyToClipboard } from '../util/utils'
 import { deleteCloudinaryImage } from '../util/cloudinaryUtils'
 import { useMessage } from '../context/MessageContext'
+import {
+  FaBroom,
+  FaCopy,
+  FaEdit,
+  FaRegCopy,
+  FaSave,
+  FaSignOutAlt,
+  FaTrash,
+} from 'react-icons/fa'
+import {
+  ClearingStorageAnimation,
+  DeletingAccountAnimation,
+} from '../components/ClearingStorageAnimation'
 
 export default function SettingsPage() {
   const { db, auth, userId, isAuthReady } = useFirebase()
@@ -42,6 +55,7 @@ export default function SettingsPage() {
   const [editSettings, setEditSettings] = useState(false)
   const [deletionSpinner, setDeletionSpinner] = useState(false)
   const [clearSpinner, setClearSpinner] = useState(false)
+  const [isSaveSettings, setIsSaveSettings] = useState(false)
 
   const [showReauthModal, setShowReauthModal] = useState(false)
   const [reauthPassword, setReauthPassword] = useState('')
@@ -185,7 +199,7 @@ export default function SettingsPage() {
     }
 
     if (!db || !userId) return
-
+    setIsSaveSettings(true)
     const userSettingsDocRef = doc(
       db,
       `artifacts/${appId}/users/${userId}/userSettings`,
@@ -201,6 +215,7 @@ export default function SettingsPage() {
       setMessage('Failed to save settings.')
       setMessageType('error')
     }
+    setIsSaveSettings(false)
   }
   // Removed handleSaveSettings as it's merged into saveSettings
   // --- END OPTIMIZATION ---
@@ -501,9 +516,8 @@ export default function SettingsPage() {
               <label
                 key={`workout-${index}`}
                 className={`flex items-center sm:space-x-2 space-x-1  py-1 px-2  rounded-md  border border-gray-950 bg-gray-900 ${
-                  editSettings
-                    ? 'hover:shadow-[0px_0px_0px_0px_#030712] cursor-pointer'
-                    : ''
+                  !editSettings
+                    ? '': isSaveSettings ? "":'hover:shadow-[0px_0px_0px_0px_#030712] cursor-pointer'
                 } shadow-[5px_5px_0px_0px_#030712] duration-500`}
               >
                 <input
@@ -525,7 +539,7 @@ export default function SettingsPage() {
                   }}
                   className='form-checkbox h-3 w-3 sm:h-5 sm:w-5 text-blue-500 rounded-md bg-gray-700 border-gray-500 checked:bg-blue-500'
                   aria-label={`Toggle ${day} as a workout day`}
-                  disabled={!editSettings}
+                  disabled={!editSettings||isSaveSettings}
                 />
                 <span>{day}</span>
               </label>
@@ -533,7 +547,7 @@ export default function SettingsPage() {
           </div>
         </fieldset>
         <fieldset className='my-4'>
-          <h3 className=' sm:text-xl text-base xs:text-lg font-semibold text-gray-200 mb-2 sm:mb-3'>
+          <h3 className=' sm:text-xl text-base xs:text-lg font-semibold text-gray-200 mb-t sm:mt-3'>
             Notification Display Time (sec)
           </h3>
           <div className='mb-4 flex items-center justify-between'>
@@ -557,9 +571,9 @@ export default function SettingsPage() {
                 }))
               } // Update settings directly
               className={`p-1.5 sm:p-3  ${
-                editSettings ? 'bg-gray-700' : 'bg-gray-900'
+                !editSettings ?'bg-gray-900': isSaveSettings?'bg-gray-900':'bg-gray-700'
               } shadow-[5px_5px_0px_0px_#030712] border border-gray-950 ml-5 max-w-[200px] rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100`}
-              disabled={!editSettings}
+              disabled={!editSettings||isSaveSettings}
             />
           </div>
         </fieldset>
@@ -586,19 +600,37 @@ export default function SettingsPage() {
               }}
               className='form-checkbox h-5 w-5 text-blue-500 rounded-md bg-gray-700 border-gray-500  checked:bg-blue-500 ml-4'
               aria-label='Toggle lock protection on app launch'
-              disabled={!editSettings}
+              disabled={!editSettings||isSaveSettings}
             />
           </div>
         </fieldset>
         <button
           onClick={saveSettings}
+          disabled={isSaveSettings}
           className={`sm:px-4 sm:py-2 px-2 py-1 text-sm sm:text-base  text-white rounded-md w-full transition-colors shadow-[2px_2px_0px_0px_#030712] border border-gray-950 ${
             editSettings
               ? 'hover:bg-green-700 bg-green-600'
               : 'hover:bg-indigo-700 bg-indigo-600'
-          }`}
+          } ${isSaveSettings?'cursor-not-allowed':''} `}
         >
-          {editSettings ? 'Save Settings' : '✏️ Edit Settings'}
+          {editSettings ? (
+            <span>
+              {isSaveSettings ? (
+                <span className='items-center flex gap-2 justify-center'>
+                  <FaSave /> Saving
+                  <span className='flex animate-spin w-4 h-4 border-2 border-t-transparent border-gray-300 rounded-full'></span>
+                </span>
+              ) : (
+                <span className='items-center flex gap-2 justify-center'>
+                  <FaSave /> Save
+                </span>
+              )}
+            </span>
+          ) : (
+            <span className='items-center flex gap-2 justify-center'>
+              <FaEdit /> Edit Settings
+            </span>
+          )}
         </button>
       </div>
 
@@ -625,7 +657,7 @@ export default function SettingsPage() {
                     : 'Copy user ID to clipboard'
                 }
               >
-                {copied === userId ? '✨' : '📋'}
+                {copied === userId ? <FaCopy /> : <FaRegCopy />}
               </button>
             </div>
           </div>
@@ -649,7 +681,7 @@ export default function SettingsPage() {
                     : 'Copy user Email to clipboard'
                 }
               >
-                {copied === userEmail ? '✨' : '📋'}
+                {copied === userEmail ? <FaCopy /> : <FaRegCopy />}
               </button>
             </div>
           </div>
@@ -663,24 +695,24 @@ export default function SettingsPage() {
         </h3>
         <button
           onClick={() => setShowConfirmSignOutModal(true)}
-          className='w-full px-2 py-1 sm:px-4 sm:py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
+          className='w-full px-2 py-1 sm:px-4 sm:py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950 flex gap-2 items-center justify-center'
           aria-label='Sign out of your account'
         >
-          Sign Out
+          Sign Out <FaSignOutAlt />
         </button>
         <button
           onClick={() => setShowConfirmClearDataModal(true)} // This button now clears data only
-          className='w-full px-2 py-1 sm:px-4 sm:py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
+          className='w-full px-2 py-1 sm:px-4 sm:py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950 flex gap-2 items-center justify-center'
           aria-label='Clear all your workout data'
         >
-          🧹 Clear All My Data
+          <FaBroom /> Clear All My Data
         </button>
         <button
           onClick={() => setShowConfirmDeleteAccountModal(true)} // This button now deletes account + all data
-          className='w-full px-2 py-1 sm:px-4 sm:py-2 bg-red-800 text-white rounded-md hover:bg-red-900 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
+          className='w-full px-2 py-1 sm:px-4 sm:py-2 bg-red-800 text-white rounded-md hover:bg-red-900 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950 flex gap-2 items-center justify-center'
           aria-label='Permanently delete your account and all associated data'
         >
-          🔥 Delete My Account
+          <FaTrash /> Delete My Account
         </button>
       </div>
 
@@ -836,29 +868,8 @@ export default function SettingsPage() {
           </div>
         </Modal>
       )}
-      {deletionSpinner && (
-        <div className='fixed inset-0 h-screen  w-screen overflow-hidden  select-none top-0 left-0 backdrop-blur-lg bg-opacity-20 bg-gray-900 z-[50] flex items-center justify-center'>
-          <div className='bg-red-800 text-white p-6 rounded-lg text-center relative sm:max-w-sm w-full animate-flash max-w-[85vw] shadow-[5px_5px_0px_0px_#030712] border border-gray-300 bg-opacity-75 flex flex-col items-center'>
-            <h2
-              id='deletion-account-progress'
-              className='text-lg font-bold mb-4'
-            >
-              Deleting Data & Account
-            </h2>
-            <span className='flex animate-spin w-10 h-10 border-4 border-t-transparent border-gray-300 rounded-full'></span>
-          </div>
-        </div>
-      )}
-      {clearSpinner && (
-        <div className='fixed inset-0 h-screen  w-screen overflow-hidden  select-none top-0 left-0 backdrop-blur-lg bg-opacity-20 bg-gray-900 z-[50] flex items-center justify-center'>
-          <div className='bg-orange-600 text-white p-6 rounded-lg text-center relative sm:max-w-sm w-full animate-flash max-w-[85vw] shadow-[5px_5px_0px_0px_#030712] border border-gray-300 bg-opacity-75 flex flex-col items-center'>
-            <h2 id='clearing-data-progress' className='text-lg font-bold mb-4'>
-              Clearing Data
-            </h2>
-            <span className='flex animate-spin w-10 h-10 border-4 border-t-transparent border-gray-300 rounded-full'></span>
-          </div>
-        </div>
-      )}
+      {deletionSpinner && <DeletingAccountAnimation /> }
+      {clearSpinner && <ClearingStorageAnimation />}
     </div>
   )
 }

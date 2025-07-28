@@ -8,6 +8,7 @@ import {
 } from '../util/cloudinaryUtils'
 import { doc, setDoc } from 'firebase/firestore' // Import setDoc and doc
 import { useMessage } from '../context/MessageContext'
+import { FaBroom, FaMinus, FaPlus, FaSave } from 'react-icons/fa'
 
 export default function MeasurementModal({
   monthData,
@@ -42,6 +43,7 @@ export default function MeasurementModal({
   const { setMessage, setMessageType } = useMessage()
   const [showConfirmClearModal, setShowConfirmClearModal] = useState(false)
   const [uploadingOverall, setUploadingOverall] = useState(false)
+  const [clearingOverall, setClearingOverall] = useState(false)
 
   const handleFieldChange = (e) => {
     const { name, value } = e.target
@@ -106,10 +108,7 @@ export default function MeasurementModal({
         setMessageType('success')
         deletionSuccessfulFromCloudinary = true
       } catch (e) {
-        console.error(
-          `Error deleting Cloudinary image :`,
-          e
-        )
+        console.error(`Error deleting Cloudinary image :`, e)
         setMessage('Failed to delete image from Cloudinary.')
         setMessageType('error')
         // deletionSuccessfulFromCloudinary remains false
@@ -196,10 +195,10 @@ export default function MeasurementModal({
     { label: 'Calves (in)', key: 'calves', type: 'number', optional: false },
   ]
   const handleCleardata = async () => {
-    setUploadingOverall(true)
+    setClearingOverall(true)
     setShowConfirmClearModal(false)
     await onClearData(formData.date)
-    setUploadingOverall(false)
+    setClearingOverall(false)
   }
   const handleSaveClick = async () => {
     const requiredFields = measurementFields.filter((field) => !field.optional)
@@ -396,7 +395,7 @@ export default function MeasurementModal({
                   )}
                 </div>
               ) : (
-                <label className='w-20 h-20 sm:w-24 sm:h-24 border border-dashed border-gray-600 rounded-md flex items-center justify-center cursor-pointer flex-shrink-0 bg-gray-900 hover:bg-gray-800 transition-colors'>
+                <label className='w-20 h-20 sm:w-24 sm:h-24 border border-dashed border-gray-600 rounded-md flex items-center justify-center cursor-pointer flex-shrink-0 bg-gray-900 hover:bg-gray-800 transition-colors text-gray-400'>
                   <input
                     type='file'
                     accept='image/*'
@@ -405,7 +404,7 @@ export default function MeasurementModal({
                     disabled={uploadingOverall}
                     aria-label={`Upload image ${index + 1}`}
                   />
-                  <span className='text-gray-400 text-3xl'>+</span>
+                  <FaPlus />
                 </label>
               )}
 
@@ -435,11 +434,11 @@ export default function MeasurementModal({
 
               <button
                 onClick={() => handleRemoveImageField(index)}
-                className='sm:p-2 p-1 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors sm:mr-1 shadow-[2px_2px_0px_0px_#030712] border border-gray-950 mr-1 flex-shrink-0'
+                className='sm:p-4 p-[9px] bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors sm:mr-1 shadow-[2px_2px_0px_0px_#030712] border border-gray-950 mr-1 flex-shrink-0'
                 disabled={uploadingOverall}
                 aria-label={`Remove image ${index + 1}`}
               >
-                🗑️
+                <FaMinus />
               </button>
             </div>
           ))}
@@ -449,9 +448,17 @@ export default function MeasurementModal({
               className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full '
               disabled={uploadingOverall}
             >
-              {formData.imageUrls.length > 0
-                ? '➕ Add Another Image'
-                : '➕ Add Image'}
+              {formData.imageUrls.length > 0 ? (
+                <span className='flex gap-2 items-center justify-center'>
+                  <FaPlus />
+                  Add Another Image
+                </span>
+              ) : (
+                <span className='flex gap-2 items-center justify-center'>
+                  <FaPlus />
+                  Add Image
+                </span>
+              )}
             </button>
           )}
         </div>
@@ -507,25 +514,44 @@ export default function MeasurementModal({
           <button
             onClick={() => setShowConfirmClearModal(true)}
             className={`px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-orange-600 text-white rounded-md  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 ${
-              uploadingOverall
+              uploadingOverall || clearingOverall
                 ? 'bg-orange-900'
                 : 'bg-orange-600 hover:bg-orange-700'
             }`}
-            disabled={uploadingOverall}
+            disabled={uploadingOverall || clearingOverall}
           >
-            🧹 Clear Data
+            {clearingOverall ? (
+              <span className='items-center flex gap-2 justify-center'>
+                Clearing
+                <span className='flex animate-spin w-4 h-4 border-2 border-t-transparent border-gray-300 rounded-full'></span>
+              </span>
+            ) : (
+              <span className='items-center flex gap-2 justify-center'>
+                <FaBroom /> Clear Data
+              </span>
+            )}
           </button>
         )}
         <button
           onClick={handleSaveClick}
           className={`px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base  text-white rounded-md  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 ${
-            uploadingOverall
+            uploadingOverall || clearingOverall
               ? 'bg-green-900'
               : 'bg-green-600 hover:bg-green-700'
           }`}
-          disabled={uploadingOverall}
+          disabled={uploadingOverall || clearingOverall}
         >
-          {uploadingOverall ? 'Uploading...' : 'Save Measurement'}
+          {uploadingOverall ? (
+            <span className='items-center flex gap-2 justify-center'>
+              Uploading
+              <span className='flex animate-spin w-4 h-4 border-2 border-t-transparent border-gray-300 rounded-full'></span>
+            </span>
+          ) : (
+            <span className='items-center flex gap-2 justify-center'>
+              <FaSave />
+              Save Measurement
+            </span>
+          )}
         </button>
       </div>
 

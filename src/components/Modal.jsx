@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { FaTimes } from 'react-icons/fa'
 
 export default function Modal({ children, onClose , disableClose }) {
   const modalRef = useRef(null)
@@ -37,10 +38,10 @@ export default function Modal({ children, onClose , disableClose }) {
         <button
           onClick={onClose}
           disabled={disableClose}
-          className={`absolute sm:top-3 right-3 text-gray-400 ${!disableClose&&'hover:text-gray-100'} text-2xl font-bold`}
+          className={`absolute sm:top-3 right-3 text-gray-400 ${!disableClose&&'hover:text-gray-100'} text-xl font-bold`}
           aria-label='Close modal'
         >
-          &times;
+          <FaTimes />
         </button>
         {children}
       </div>

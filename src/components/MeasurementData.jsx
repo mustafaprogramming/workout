@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import ImagePreviewModal from './ImagePreviewModal'
+import { FaChevronDown, FaChevronUp } from 'react-icons/fa'
 
 export default function MeasurementData({ m }) {
   const [showMeasurement, setShowMeasurement] = useState(false)
@@ -24,21 +25,23 @@ export default function MeasurementData({ m }) {
     <div
       className={`bg-gray-900 ${
         showMeasurement ? '' : 'hover:shadow-[0px_0px_0px_0px_#030712]'
-      } sm:shadow-[5px_5px_0px_0px_#030712] shadow-[2px_2px_0px_0px_#030712] py-1.5 xs:py-3 border border-gray-950 rounded-lg duration-500`}
+      } sm:shadow-[5px_5px_0px_0px_#030712] shadow-[2px_2px_0px_0px_#030712] overflow-hidden border border-gray-950 rounded-lg duration-500`}
     >
-      <div className='flex justify-between items-center '>
-        <p className='font-semibold text-blue-400  text-sm xs:text-base sm:text-lg py-1 px-4 rounded-md bg-gray-900'>
+      <button
+        className='flex justify-between items-center w-full py-1.5 xs:py-3'
+        onClick={() => setShowMeasurement(!showMeasurement)}
+      >
+        <span className='font-semibold text-blue-400  text-sm xs:text-base sm:text-lg py-1 px-4'>
           {m.date}
-        </p>
-        <button
-          onClick={() => setShowMeasurement(!showMeasurement)}
-          className='bg-gray-950 hover:bg-[#030712ad] px-4 py-1 mr-3 rounded-md text-xs xs:text-sm sm:text-base text-gray-400 shadow-[2px_2px_0px_0px_#030712] border border-gray-950'
+        </span>
+        <span
+          className=' px-4 py-1 mr-3 rounded-md text-xs xs:text-sm sm:text-base text-gray-400'
           aria-expanded={showMeasurement}
           aria-controls={`measurement-data-${m.date}`}
         >
-          {showMeasurement ? 'Hide' : 'Show'}
-        </button>
-      </div>
+          {showMeasurement ? <FaChevronUp /> : <FaChevronDown />}
+        </span>
+      </button>
 
       <div
         id={`measurement-data-${m.date}`}
@@ -150,25 +153,18 @@ export default function MeasurementData({ m }) {
 
         {/* Notes */}
         {m.notes && (
-          <p className='text-xs sm:text-sm text-gray-300 italic border-y border-gray-500 bg-gray-800 sm:py-3 sm:px-6 py-1.5 px-3'>
+          <p
+            className={`text-xs sm:text-sm text-gray-300 italic border-t border-gray-500 bg-gray-800 sm:py-3 sm:px-6 py-1.5 px-3`}
+          >
             Notes: {m.notes}
           </p>
-        )}
-
-        {/* Image Preview Modal */}
-        {showImagePreview && (
-          <ImagePreviewModal
-            imageUrl={previewImageUrl}
-            imageLabel={previewImageLabel}
-            onClose={() => setShowImagePreview(false)}
-          />
         )}
 
         {/* Image Thumbnails */}
         {m.imageUrls &&
           m.imageUrls.length > 0 &&
           m.imageUrls.find((img) => img.url !== '') && (
-            <div className='sm:py-3 sm:px-6 py-1.5 px-3'>
+            <div className='sm:py-3 sm:px-6 py-1.5 px-3 border-t border-gray-500'>
               <h4 className='font-semibold xs:text-base text-sm text-gray-200 mb-2 xs:mb-4'>
                 Physique Images:
               </h4>
@@ -210,6 +206,14 @@ export default function MeasurementData({ m }) {
               </div>
             </div>
           )}
+        {/* Image Preview Modal */}
+        {showImagePreview && (
+          <ImagePreviewModal
+            imageUrl={previewImageUrl}
+            imageLabel={previewImageLabel}
+            onClose={() => setShowImagePreview(false)}
+          />
+        )}
       </div>
     </div>
   )

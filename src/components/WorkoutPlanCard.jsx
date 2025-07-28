@@ -1,6 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useMessage } from '../context/MessageContext'
-
+import {
+  FaBackward,
+  FaChevronDown,
+  FaChevronUp,
+  FaEdit,
+  FaMinus,
+  FaPlus,
+  FaRegClock,
+  FaSave,
+  FaTrash,
+} from 'react-icons/fa'
 export default function WorkoutPlanCard({
   planId, // New prop: unique ID for the plan
   planName, // New prop: name of the plan
@@ -26,7 +36,7 @@ export default function WorkoutPlanCard({
       setMessage('')
     } else {
       // When exiting edit mode, ensure local state matches prop if not saved
-      setEditablePlanName(planName);
+      setEditablePlanName(planName)
     }
   }, [isEditing, exercises, planName]) // Added planName to dependencies
 
@@ -90,10 +100,12 @@ export default function WorkoutPlanCard({
     if (editablePlanName.trim() === '') {
       setMessage('Workout plan name cannot be empty.')
       setMessageType('error')
-      return;
+      return
     }
 
-    const hasEmptyExerciseName = editableExercises.some((ex) => ex.name.trim() === '')
+    const hasEmptyExerciseName = editableExercises.some(
+      (ex) => ex.name.trim() === ''
+    )
     if (hasEmptyExerciseName) {
       setMessage('All exercises must have a name before saving.')
       setMessageType('error')
@@ -104,24 +116,25 @@ export default function WorkoutPlanCard({
       ...ex,
       name: ex.name.trim(),
       // Ensure sets are also cleaned, removing empty sets if needed
-      sets: ex.sets.filter(set => set.reps || set.weight || set.restTime || set.rpe)
-                   .map(set => ({
-                     reps: set.reps.trim(),
-                     weight: set.weight.trim(),
-                     restTime: set.restTime.trim(),
-                     rpe: set.rpe.trim(),
-                   }))
-    }));
+      sets: ex.sets
+        .filter((set) => set.reps || set.weight || set.restTime || set.rpe)
+        .map((set) => ({
+          reps: set.reps.trim(),
+          weight: set.weight.trim(),
+          restTime: set.restTime.trim(),
+          rpe: set.rpe.trim(),
+        })),
+    }))
 
     // Filter out exercises that have no name and no sets after cleaning
-    const finalExercisesToSave = cleanedExercises.filter(ex => ex.name.trim() !== '' || ex.sets.length > 0);
-
+    const finalExercisesToSave = cleanedExercises.filter(
+      (ex) => ex.name.trim() !== '' || ex.sets.length > 0
+    )
 
     // Call the onSaveExercises prop with the planId and updated exercises
-    onSaveExercises(planId, editablePlanName, finalExercisesToSave);
-    setMessage('');
+    onSaveExercises(planId, editablePlanName, finalExercisesToSave)
+    setMessage('')
   }
-
 
   return (
     <div
@@ -148,7 +161,7 @@ export default function WorkoutPlanCard({
           )}
         </h4>
         <span className='text-gray-400 text-xl sm:text-2xl ml-2'>
-          {isExpanded ? '▲' : '▼'}
+          {isExpanded ? <FaChevronUp /> : <FaChevronDown />}
         </span>
       </div>
 
@@ -156,7 +169,9 @@ export default function WorkoutPlanCard({
         <div className='mt-4'>
           {/* "No exercises added" message */}
           {(isEditing ? editableExercises : exercises).length === 0 && (
-            <p className='text-gray-400 text-center py-4'>No exercises added in this plan.</p>
+            <p className='text-gray-400 text-center py-4'>
+              No exercises added in this plan.
+            </p>
           )}
 
           {(isEditing ? editableExercises : exercises).length > 0 && (
@@ -179,7 +194,9 @@ export default function WorkoutPlanCard({
                     <th className='sm:py-3 sm:px-6 py-1.5 px-2 text-left'>
                       Rest Time
                     </th>
-                    <th className='sm:py-3 sm:px-6 py-1.5 px-2 text-left'>RPE</th>
+                    <th className='sm:py-3 sm:px-6 py-1.5 px-2 text-left'>
+                      RPE
+                    </th>
                     {isEditing && (
                       <th className='sm:py-3 sm:px-6 py-1.5 px-2 text-center'>
                         Actions
@@ -234,9 +251,9 @@ export default function WorkoutPlanCard({
                             <td className='sm:py-3 sm:px-6 py-1.5 px-2 text-center'>
                               <button
                                 onClick={() => handleDeleteExercise(exIndex)}
-                                className='bg-red-600 hover:bg-red-700 text-white px-2 sm:px-3 py-1 rounded-md text-xs shadow-[2px_2px_0px_0px_#030712] border border-gray-950'
+                                className='bg-red-600 hover:bg-red-700 text-white px-2 sm:px-3 py-1.5 sm:py-3 rounded-md text-xs shadow-[2px_2px_0px_0px_#030712] border border-gray-950'
                               >
-                                Delete
+                                <FaTrash />
                               </button>
                             </td>
                           )}
@@ -341,9 +358,9 @@ export default function WorkoutPlanCard({
                                   onClick={() =>
                                     handleDeleteSet(exIndex, setIndex)
                                   }
-                                  className='bg-red-500 hover:bg-red-600 text-white px-2 py-0.5 rounded-md text-xs shadow-[2px_2px_0px_0px_#030712] border border-gray-950'
+                                  className='bg-red-500 hover:bg-red-600 text-white px-2 sm:py-2 py-1.5 rounded-md text-xs shadow-[2px_2px_0px_0px_#030712] border border-gray-950'
                                 >
-                                  Delete
+                                  <FaMinus />
                                 </button>
                               </td>
                             )}
@@ -357,9 +374,9 @@ export default function WorkoutPlanCard({
                             >
                               <button
                                 onClick={() => handleAddSet(exIndex)}
-                                className='bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md text-xs shadow-[2px_2px_0px_0px_#030712] border border-gray-950'
+                                className='bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md text-xs shadow-[2px_2px_0px_0px_#030712] border border-gray-950 flex gap-1 items-center justify-center mx-auto'
                               >
-                                + Add Set
+                                <FaPlus /> Add Set
                               </button>
                             </td>
                           </tr>
@@ -371,38 +388,38 @@ export default function WorkoutPlanCard({
               </table>
             </div>
           )}
-          
+
           <div className='mt-4 flex flex-wrap justify-end gap-2'>
             {isEditing ? (
               <>
                 <button
                   onClick={handleAddExercise}
-                  className='sm:px-4 sm:py-2 px-2 py-1 text-sm sm:text-base bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[2px_2px_0px_0px_#030712] border border-gray-950'
+                  className='sm:px-4 sm:py-2 px-2 py-1 text-sm sm:text-base bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[2px_2px_0px_0px_#030712] border border-gray-950 flex gap-1 items-center justify-center'
                 >
-                  ➕ Add Exercise
+                  <FaPlus /> Add Exercise
                 </button>
                 <button
                   onClick={handleSaveClick}
-                  className='sm:px-4 sm:py-2 px-2 py-1 text-sm sm:text-base bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-[2px_2px_0px_0px_#030712] border border-gray-950'
+                  className='sm:px-4 sm:py-2 px-2 py-1 text-sm sm:text-base bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors shadow-[2px_2px_0px_0px_#030712] flex gap-1 items-center justify-center border border-gray-950'
                 >
-                  Save Plan
+                  <FaSave /> Save Plan
                 </button>
               </>
             ) : (
               <button
                 onClick={onEditToggle}
-                className='sm:px-4 sm:py-2 px-2 py-1 text-sm sm:text-base bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-[2px_2px_0px_0px_#030712] border border-gray-950'
+                className='sm:px-8 sm:py-2 px-2 xs:px-4 py-1 text-sm sm:text-base bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-[2px_2px_0px_0px_#030712] flex gap-2 items-center justify-center border border-gray-950'
               >
-                ✏️ Edit Plan
+                <FaEdit /> Edit Plan
               </button>
             )}
             {/* Delete Plan Button - only shown when not editing */}
             {!isEditing && (
               <button
                 onClick={() => onDeletePlan(planId)} // Pass planId to delete handler
-                className='sm:px-4 sm:py-2 px-2 py-1 text-sm sm:text-base bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-[2px_2px_0px_0px_#030712] border border-gray-950'
+                className='sm:px-8 sm:py-2 px-2 xs:px-4 py-1 text-sm sm:text-base bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-[2px_2px_0px_0px_#030712] flex gap-2 items-center justify-center border border-gray-950'
               >
-                🗑️ Delete Plan
+                <FaTrash /> Delete Plan
               </button>
             )}
           </div>

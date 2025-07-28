@@ -5,6 +5,9 @@ import {
   signInWithEmailAndPassword,
 } from 'firebase/auth'
 import { useMessage } from '../context/MessageContext'
+//ICONS
+import { FaEye, FaEyeSlash } from 'react-icons/fa'
+import { FaSignInAlt, FaUserPlus } from 'react-icons/fa'
 
 export default function AuthPage() {
   const { auth } = useFirebase()
@@ -13,7 +16,7 @@ export default function AuthPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isRegistering, setIsRegistering] = useState(true)
   const [loading, setLoading] = useState(false)
-  const {  setMessage, setMessageType  } = useMessage()
+  const { setMessage, setMessageType } = useMessage()
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
@@ -85,18 +88,24 @@ export default function AuthPage() {
   }
 
   return (
-    <div className='flex items-center justify-center min-h-[calc(100vh-10rem)] p-2 xs-p-4 sm:p-8'>
-      <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-3  xs:p-4 sm:p-8 rounded-xl  w-full max-w-md text-gray-100'>
+    <div className='flex items-center justify-center min-h-[calc(100vh-10rem)] p-4 sm:p-8'>
+      <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-4 sm:p-8 rounded-xl  w-full max-w-md text-gray-100'>
         <h2
           className='text-2xl mt-4 font-bold text-blue-400 mb-6 text-center'
           style={{ textShadow: '3px 3px 0px rgba(0, 0, 0, 0.5)' }}
         >
-          {isRegistering ? 'Register' : 'Login'}
+          {isRegistering ? (
+            <span className='flex gap-3 items-center justify-center'>
+              Register <FaUserPlus />
+            </span>
+          ) : (
+            <span className='flex gap-3 items-center justify-center'>
+              Login <FaSignInAlt />
+            </span>
+          )}
         </h2>
 
-        
-
-        <div className='space-y-2 sm:space-y-4 mb-6'>
+        <div className='space-y-3 sm:space-y-4 mb-6'>
           <input
             type='email'
             placeholder='Email'
@@ -105,7 +114,7 @@ export default function AuthPage() {
             aria-label='Email address'
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className='px-1.5 py-1 sm:p-3 w-full  bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950  rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 text-sm sm:text-base'
+            className='px-2 py-1.5 sm:p-3 w-full  bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950  rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 text-sm sm:text-base'
             disabled={loading}
           />
           <div className='relative'>
@@ -117,16 +126,16 @@ export default function AuthPage() {
               autoComplete='password'
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className='px-1.5 py-1 sm:p-3 w-full  bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950  rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 pr-10 text-sm sm:text-base'
+              className='px-2 py-1.5 sm:p-3 w-full  bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950  rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 pr-10 text-sm sm:text-base'
               disabled={loading}
             />
             <button
               type='button'
               aria-label='Toggle password visibility'
               onClick={() => setShowPassword(!showPassword)}
-              className='absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-gray-400 hover:text-gray-200'
+              className='absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-blue-600 hover:text-blue-700'
             >
-              {showPassword ? '🙈' : '👁️'} 
+              {showPassword ? <FaEye /> : <FaEyeSlash />}
             </button>
           </div>
           {isRegistering && (
@@ -139,16 +148,16 @@ export default function AuthPage() {
                 aria-label='Confirm password'
                 autoComplete='password'
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className='px-1.5 py-1 sm:p-3 w-full bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 pr-10 text-sm sm:text-base'
+                className='px-2 py-1.5 sm:p-3 w-full bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 pr-10 text-sm sm:text-base'
                 disabled={loading}
               />
               <button
                 type='button'
                 aria-label='Toggle confirm password visibility'
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className='absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-gray-400 hover:text-gray-200'
+                className='absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5 text-blue-600 hover:text-blue-700'
               >
-                {showConfirmPassword ? '🙈' : '👁️'}
+                {showConfirmPassword ? <FaEye /> : <FaEyeSlash />}
               </button>
             </div>
           )}
@@ -157,10 +166,20 @@ export default function AuthPage() {
         <button
           onClick={handleAuthAction}
           aria-label={isRegistering ? 'Register account' : 'Login to account'}
-          className='w-full px-4 py-1 sm:py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[5px_5px_0px_0px_#030712] border border-gray-950 font-semibold text-sm sm:text-base'
+          className='w-full px-4 py-2 sm:py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[5px_5px_0px_0px_#030712] border border-gray-950 font-semibold text-sm sm:text-base'
           disabled={loading}
         >
-          {loading ? 'Processing...' : isRegistering ? 'Register' : 'Login'}
+          {loading ? (
+            'Processing...'
+          ) : isRegistering ? (
+            <span className='flex gap-2 items-center justify-center'>
+              Register <FaUserPlus />
+            </span>
+          ) : (
+            <span className='flex gap-2 items-center justify-center'>
+              LogIn <FaSignInAlt />
+            </span>
+          )}
         </button>
 
         <p className='text-center text-gray-400 text-sm sm:text-base my-4'>
@@ -175,7 +194,7 @@ export default function AuthPage() {
             className='text-blue-400 hover:underline font-medium'
             disabled={loading}
           >
-            {isRegistering ? 'Login' : 'Register'}
+            {isRegistering ? `Login` : 'Register'}
           </button>
         </p>
       </div>

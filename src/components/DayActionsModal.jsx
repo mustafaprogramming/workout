@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react'
 import Modal from './Modal'
+import {
+  FaBed,
+  FaCheck,
+  FaFileSignature,
+  FaQuestion,
+  FaSync,
+  FaTimes,
+} from 'react-icons/fa'
 
 export default function DayActionsModal({
   date,
@@ -58,10 +66,10 @@ export default function DayActionsModal({
       </h2>
 
       <div className='mb-6'>
-        <p className='text-gray-200'>
+        <p className='text-gray-200 flex items-center'>
           Current Status:
           <span
-            className={`font-semibold ml-2 ${
+            className={`font-semibold ml-2  ${
               effectiveType === 'workout' && hasWorkoutLogged
                 ? 'text-green-400'
                 : effectiveType === 'workout' && !hasWorkoutLogged
@@ -71,13 +79,23 @@ export default function DayActionsModal({
                 : 'text-gray-400'
             }`}
           >
-            {effectiveType === 'workout' && hasWorkoutLogged
-              ? 'Workout Done ✅'
-              : effectiveType === 'workout' && !hasWorkoutLogged
-              ? 'Workout Undone ❌'
-              : effectiveType === 'rest'
-              ? 'Rest Day 🛌'
-              : 'Unassigned ❓'}
+            {effectiveType === 'workout' && hasWorkoutLogged ? (
+              <span className='flex items-center gap-2'>
+                Workout Done <FaCheck />
+              </span>
+            ) : effectiveType === 'workout' && !hasWorkoutLogged ? (
+              <span className='flex items-center gap-2'>
+                Workout Undone <FaTimes />
+              </span>
+            ) : effectiveType === 'rest' ? (
+              <span className='flex items-center gap-2'>
+                Rest Day <FaBed />
+              </span>
+            ) : (
+              <span className='flex items-center gap-2'>
+                Unassigned <FaQuestion />
+              </span>
+            )}
           </span>
         </p>
       </div>
@@ -162,9 +180,9 @@ export default function DayActionsModal({
           <button
             onClick={onLogWorkout}
             aria-label='Log workout for this day'
-            className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full'
+            className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full flex items-center justify-center gap-2'
           >
-            📝 Log Workout
+            <FaFileSignature /> Log Workout
           </button>
         )}
 
@@ -177,9 +195,9 @@ export default function DayActionsModal({
               )
             }
             aria-label='Convert workout day to rest day'
-            className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full'
+            className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full flex items-center justify-center gap-2'
           >
-            🔄 Convert to Rest Day
+            <FaSync /> Convert to Rest Day
           </button>
         ) : (
           <button
@@ -190,9 +208,9 @@ export default function DayActionsModal({
               )
             }
             aria-label='Convert rest day to workout day'
-            className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full'
+            className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full flex items-center justify-center gap-2'
           >
-            🔄 Convert to Workout Day
+            <FaSync /> Convert to Workout Day
           </button>
         )}
       </div>
@@ -211,7 +229,9 @@ export default function DayActionsModal({
           >
             Confirm Action
           </h2>
-          <p className='text-gray-200 mb-6 text-sm sm:text-base'>{confirmMessage}</p>
+          <p className='text-gray-200 mb-6 text-sm sm:text-base'>
+            {confirmMessage}
+          </p>
           <div className='flex justify-end space-x-3'>
             <button
               onClick={() => setShowConfirmModal(false)}

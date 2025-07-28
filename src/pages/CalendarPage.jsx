@@ -6,6 +6,7 @@ import DayActionsModal from '../components/DayActionsModal'
 import { useNavigation } from '../context/NavigationContext'
 import { ROUTES } from '../route'
 import { useMessage } from '../context/MessageContext'
+import { FaBackward, FaBan, FaBed, FaCheck, FaForward, FaHourglassHalf, FaSearch, FaTimes } from 'react-icons/fa'
 
 export default function CalendarPage({ setSelectedDate }) {
   const { db, userId, isAuthReady, userCreatedAt } = useFirebase()
@@ -257,10 +258,10 @@ export default function CalendarPage({ setSelectedDate }) {
         textColor = 'text-gray-600'
         isDisabled = true
         if (isFutureDate) {
-          statusEmoji = '⏳'
+          statusEmoji = <FaHourglassHalf className='text-yellow-300'	/>
           ariaDescription += ' This is a future date, no actions available.'
         } else {
-          statusEmoji = '🚫'
+          statusEmoji = <FaBan	className='text-red-300' />
           ariaDescription +=
             ' This date is before your account creation, no actions available.'
         }
@@ -269,18 +270,19 @@ export default function CalendarPage({ setSelectedDate }) {
           if (hasWorkoutLogged) {
             bgColor = 'bg-green-700'
             borderColor = 'border-green-600'
-            statusEmoji = '✅'
+            statusEmoji = <FaCheck className='text-green-300' />
             ariaDescription += ' Workout day, workout logged.'
           } else {
             bgColor = 'bg-red-700'
             borderColor = 'border-red-600'
-            statusEmoji = '❌'
+            statusEmoji = <FaTimes className='text-red-300' />
             ariaDescription += ' Workout day, no workout logged.'
           }
         } else if (effectiveType === 'rest') {
           bgColor = 'bg-yellow-700'
           borderColor = 'border-yellow-600'
-          statusEmoji = '🛌'
+          statusEmoji = <FaBed className='text-white' />
+
           ariaDescription += ' Rest day.'
         }
       }
@@ -332,14 +334,14 @@ export default function CalendarPage({ setSelectedDate }) {
               )
             )
           }
-          className='px-2 sm:px-4 py-1 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
+          className='px-2 sm:px-4 py-1 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[3px_3px_0px_0px_#030712] flex items-center justify-center gap-1 font-semibold border border-gray-950'
           aria-label={`Go to previous month, ${new Date(
             currentMonth.getFullYear(),
             currentMonth.getMonth() - 1,
             1
           ).toLocaleString('default', { month: 'long', year: 'numeric' })}`}
         >
-          Prev
+          <FaBackward/> Prev
         </button>
         <h3
           className='md:text-xl sm:text-lg font-semibold text-gray-200'
@@ -361,14 +363,14 @@ export default function CalendarPage({ setSelectedDate }) {
               )
             )
           }
-          className='px-2 sm:px-4 py-1 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
+          className='px-2 sm:px-4 py-1 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[3px_3px_0px_0px_#030712] flex items-center justify-center gap-1 font-semibold border border-gray-950'
           aria-label={`Go to next month, ${new Date(
             currentMonth.getFullYear(),
             currentMonth.getMonth() + 1,
             1
           ).toLocaleString('default', { month: 'long', year: 'numeric' })}`}
         >
-          Next
+          Next <FaForward/>
         </button>
       </div>
 
@@ -386,10 +388,10 @@ export default function CalendarPage({ setSelectedDate }) {
         />
         <button
           onClick={handleSearchDate}
-          className='sm:px-4 px-2 py-1.5 sm:py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 text-xs sm:text-sm md:text-base'
+          className='sm:px-4 px-2 py-1.5 sm:py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 text-xs sm:text-sm md:text-base flex items-center justify-center gap-1 font-semibold'
           aria-label='Go to selected date'
         >
-          🔍 Go to Date
+          <FaSearch /> Go to Date
         </button>
       </div>
 

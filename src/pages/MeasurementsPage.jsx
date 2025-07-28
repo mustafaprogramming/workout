@@ -5,6 +5,13 @@ import { formatDate } from '../util/utils'
 import { doc, setDoc, onSnapshot, collection } from 'firebase/firestore'
 import { deleteCloudinaryImage } from '../util/cloudinaryUtils' // Import deleteCloudinaryImage
 import { useMessage } from '../context/MessageContext'
+import {
+  FaBackward,
+  FaCheck,
+  FaForward,
+  FaPlus,
+  FaSearch,
+} from 'react-icons/fa'
 
 export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
   const { db, userId, isAuthReady } = useFirebase()
@@ -146,10 +153,10 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
               )
             )
           }
-          className='sm:px-4 px-2 py-1 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
+          className='sm:px-4 px-2 py-1 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[3px_3px_0px_0px_#030712] flex items-center justify-center gap-1 font-semibold border border-gray-950'
           aria-label={`Go to previous year, ${selectedMonth.getFullYear() - 1}`}
         >
-          Prev
+          <FaBackward /> Prev
         </button>
         <h3
           className='text-xl font-semibold text-gray-200 '
@@ -168,10 +175,10 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
               )
             )
           }
-          className='sm:px-4 px-2 py-1 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
+          className='sm:px-4 px-2 py-1 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[3px_3px_0px_0px_#030712] flex items-center justify-center gap-1 font-semibold border border-gray-950'
           aria-label={`Go to next year, ${selectedMonth.getFullYear() + 1}`}
         >
-          Next
+          Next <FaForward />
         </button>
       </div>
 
@@ -206,10 +213,10 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
         </select>
         <button
           onClick={handleSearchMonth}
-          className='sm:px-4 px-2 py-1.5 sm:py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950'
+          className='sm:px-4 px-2 py-1.5 sm:py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 flex items-center justify-center gap-1 font-semibold'
           aria-label='Go to selected month and year'
         >
-          🔍 Go to Month
+          <FaSearch /> Go to Month
         </button>
       </div>
 
@@ -270,7 +277,15 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
                 {monthName}
               </span>
               <span className='text-sm mt-1' aria-hidden='true'>
-                {hasMeaningfulMeasurements ? '✅ Logged' : '➕ Add'}
+                {hasMeaningfulMeasurements ? (
+                  <span className='flex gap-1 items-center'>
+                    <FaCheck className='text-green-300' /> Logged
+                  </span>
+                ) : (
+                  <span className='flex gap-1 items-center'>
+                    <FaPlus /> Add
+                  </span>
+                )}
               </span>
             </button>
           )
@@ -340,10 +355,7 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
                   try {
                     await deleteCloudinaryImage(img.public_id)
                   } catch (e) {
-                    console.error(
-                      `Error deleting Cloudinary image:`,
-                      e
-                    )
+                    console.error(`Error deleting Cloudinary image:`, e)
                     // Continue even if one image fails to delete
                   }
                 }

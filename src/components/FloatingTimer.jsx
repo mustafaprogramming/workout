@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-
+import { FaHourglassStart, FaStopwatch, FaTimes } from 'react-icons/fa'
 export default function FloatingTimer({
   type,
   time,
@@ -95,8 +95,8 @@ export default function FloatingTimer({
         ⁝⁝⁝
       </button>
 
-      <span className='text-blue-400 text-sm font-bold' aria-hidden='true'>
-        {type === 'stopwatch' ? '⏱️' : '⏳'}
+      <span className='text-white text-sm font-bold' aria-hidden='true'>
+        {type === 'stopwatch' ? <FaStopwatch/> : <FaHourglassStart/>}
       </span>
 
       <span className='text-gray-100 text-sm font-mono' aria-live='polite'>
@@ -116,7 +116,7 @@ export default function FloatingTimer({
         onClick={() => setShowMini(false)}
         aria-label='Close floating timer'
       >
-        ❌
+        <FaTimes/>
       </button>
     </div>
   )

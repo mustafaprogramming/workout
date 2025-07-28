@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { copyToClipboard } from '../util/utils'
 import Modal from './Modal' // Assuming you have a generic Modal component
+import { FaCopy, FaEdit, FaRegCopy, FaSave, FaTrash } from 'react-icons/fa'
+import { useMessage } from '../context/MessageContext'
 
 // Image Preview Modal
 export default function ImagePreviewModal({ imageUrl, onClose, imageLabel }) {
@@ -57,7 +59,15 @@ export default function ImagePreviewModal({ imageUrl, onClose, imageLabel }) {
                   : 'Copy image URL to clipboard'
               }
             >
-              {copied == imageUrl ? '✨ copied!' : '📋 copy link'}
+              {copied == imageUrl ? (
+                <span className='flex justify-center items-center gap-1'>
+                  <FaCopy /> copied!
+                </span>
+              ) : (
+                <span className='flex justify-center items-center gap-1'>
+                  <FaRegCopy /> copy link
+                </span>
+              )}
             </button>
           </div>
         )}
@@ -84,10 +94,13 @@ export function ImagePreviewModalGallery({
   imageData,
   onEditLabel,
 }) {
+  const { setMessage, setMessageType } = useMessage()
   const [showConfirmDelete, setShowConfirmDelete] = useState(false)
   const [copied, setCopied] = useState('')
+  const [deletingImage, setDeletingImage] = useState(false)
   // --- NEW STATE FOR EDITING ---
   const [isEditingLabel, setIsEditingLabel] = useState(false)
+  const [isSavingLabel, setIsSavingLabel] = useState(false)
   const [editableLabel, setEditableLabel] = useState(imageLabel)
   // --- END NEW STATE ---
   const imageLabelRef = useRef(null)
@@ -118,22 +131,32 @@ export function ImagePreviewModalGallery({
     setShowConfirmDelete(true)
   }
 
-  const confirmDelete = () => {
-    onDeleteImage() // Call the passed delete function
+  const confirmDelete = async () => {
     setShowConfirmDelete(false)
+    setDeletingImage(true)
+    await onDeleteImage() // Call the passed delete function
+    setDeletingImage(false)
     setTimeout(() => {
       onClose()
     }, 50)
   }
 
   // --- NEW: Handle saving the edited label ---
-  const handleSaveLabel = () => {
-    if (editableLabel.trim() === '') {
-      // Optionally add a message for empty label
-      alert('Image label cannot be empty!') // Using alert for simplicity, replace with custom modal if needed
+  const handleSaveLabel = async () => {
+    if (editableLabel.trim() === imageLabel.trim()) {
+      setMessage('Edit Image label to save.')
+      setMessageType('info')
       return
     }
-    onEditLabel(imageData, editableLabel.trim()) // Call the passed edit function
+    if (editableLabel.trim() === '') {
+      // Optionally add a message for empty label
+      setMessage('Image label cannot be empty!')
+      setMessageType('error')
+      return
+    }
+    setIsSavingLabel(true)
+    await onEditLabel(imageData, editableLabel.trim()) // Call the passed edit function
+    setIsSavingLabel(false)
     setIsEditingLabel(false) // Exit editing mode
   }
   // --- END NEW ---
@@ -198,7 +221,15 @@ export function ImagePreviewModalGallery({
                   : 'Copy image URL to clipboard'
               }
             >
-              {copied == imageUrl ? '✨ copied!' : '📋 copy link'}
+              {copied == imageUrl ? (
+                <span className='flex justify-center items-center gap-1'>
+                  <FaCopy /> copied!
+                </span>
+              ) : (
+                <span className='flex justify-center items-center gap-1'>
+                  <FaRegCopy /> copy link
+                </span>
+              )}
             </button>
           </div>
         )}
@@ -211,18 +242,37 @@ export function ImagePreviewModalGallery({
               <>
                 <button
                   onClick={handleSaveLabel}
-                  className=' bg-green-600 sm:px-4 sm:py-1 px-2 py-0.5 text-white rounded-md hover:bg-green-700 transition-colors shadow-[2px_2px_0px_0px_#030712]  border border-gray-950 w-full text-nowrap'
+                  className={`${
+                    isSavingLabel
+                      ? 'bg-green-800 cursor-not-allowed'
+                      : 'bg-green-600 hover:bg-green-700'
+                  }  sm:px-4 sm:py-1 px-2 py-0.5 text-white rounded-md  transition-colors shadow-[2px_2px_0px_0px_#030712] flex gap-2 items-center justify-center border border-gray-950 w-full text-nowrap`}
                   aria-label='Save image label'
+                  disabled={isSavingLabel}
                 >
-                  Save
+                  {isSavingLabel ? (
+                    <span className='items-center flex gap-2 justify-center'>
+                      <FaSave /> Saving
+                      <span className='flex animate-spin w-4 h-4 border-2 border-t-transparent border-gray-300 rounded-full'></span>
+                    </span>
+                  ) : (
+                    <span className='items-center flex gap-2 justify-center'>
+                      <FaSave /> Save
+                    </span>
+                  )}
                 </button>
                 <button
                   onClick={() => {
                     setIsEditingLabel(false)
                     setEditableLabel(imageLabel) // Revert to original label
                   }}
-                  className=' bg-gray-600 sm:px-4 sm:py-1 px-2 py-0.5 text-white rounded-md hover:bg-gray-700 transition-colors shadow-[2px_2px_0px_0px_#030712]  border border-gray-950 w-full text-nowrap'
-                  aria-label='Cancel label edit'
+                  className={`${
+                    isSavingLabel
+                      ? 'bg-gray-800 cursor-not-allowed'
+                      : 'bg-gray-600 hover:bg-gray-700'
+                  }  sm:px-4 sm:py-1 px-2 py-0.5 text-white rounded-md  transition-colors shadow-[2px_2px_0px_0px_#030712]  border border-gray-950 w-full text-nowrap'
+                  aria-label='Cancel label edit`}
+                  disabled={isSavingLabel}
                 >
                   Cancel
                 </button>
@@ -230,10 +280,15 @@ export function ImagePreviewModalGallery({
             ) : (
               <button
                 onClick={() => setIsEditingLabel(true)}
-                className='sm:px-4 sm:py-1 px-2 py-0.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full text-nowrap'
+                className={`sm:px-4 sm:py-1 px-2 py-0.5  text-white rounded-md  transition-colors shadow-[4px_4px_0px_0px_#030712] flex gap-2 items-center justify-center border border-gray-950 w-full text-nowrap ${
+                  deletingImage
+                    ? ' bg-blue-900'
+                    : 'hover:bg-blue-700 bg-blue-600'
+                }`}
                 aria-label='Edit image label'
+                disabled={deletingImage}
               >
-                ✏️ Edit Label
+                <FaEdit /> Edit Label
               </button>
             )}
           </div>
@@ -244,22 +299,31 @@ export function ImagePreviewModalGallery({
                 onClick={handleDeleteClick}
                 className={`sm:px-4 sm:py-1 px-2 py-0.5 
                   ${
-                    isEditingLabel
-                      ? 'bg-red-700 text-gray-300'
+                    isEditingLabel || deletingImage
+                      ? 'bg-red-700 text-gray-300 cursor-not-allowed'
                       : 'bg-red-600 hover:bg-red-700 text-white'
-                  }   rounded-md  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full text-nowrap'
+                  }   rounded-md  transition-colors shadow-[4px_4px_0px_0px_#030712] flex gap-2 items-center justify-center border border-gray-950 w-full text-nowrap'
                 aria-label='Delete image`}
-                disabled={isEditingLabel}
+                disabled={isEditingLabel || deletingImage}
               >
-                🗑️ Delete Image
+                {deletingImage ? (
+                  <span className='items-center flex gap-2 justify-center'>
+                    <FaTrash />
+                    <span className='flex animate-spin w-4 h-4 border-2 border-t-transparent border-gray-300 rounded-full'></span>
+                  </span>
+                ) : (
+                  <span className='items-center flex gap-2 justify-center'>
+                    <FaTrash />
+                  </span>
+                )}
               </button>
             ) : (
               <button
                 disabled
-                className='sm:px-4 sm:py-1 px-2 py-0.5 bg-gray-700 text-gray-400 rounded-md cursor-not-allowed relative group shadow-[4px_4px_0px_0px_#030712] border text-nowrap border-gray-950 w-full'
+                className='sm:px-4 sm:py-1 px-2 py-0.5 bg-gray-700 text-gray-400 rounded-md cursor-not-allowed relative group shadow-[4px_4px_0px_0px_#030712] flex gap-2 items-center justify-center border text-nowrap border-gray-950 w-full'
                 aria-label='Cannot delete image'
               >
-                🗑️ Delete Image
+                <FaTrash />
                 <span className='absolute bottom-full left-1 mb-2 px-3 py-1 bg-gray-500 text-white text-xs sm:text-sm md:text-base rounded-md opacity-0 group-hover:opacity-100 group-hover:h-fit  transition-opacity duration-300 text-wrap w-[200px] sm:w-[300px] md:w-[500px] select-none pointer-events-none'>
                   {deleteTooltip}
                 </span>
@@ -268,20 +332,12 @@ export function ImagePreviewModalGallery({
             <button
               onClick={onClose}
               className={`sm:px-4 sm:py-1 px-2 py-0.5  rounded-md ${
-                canDelete
-                  ? `${
-                      isEditingLabel
-                        ? 'bg-gray-950 text-gray-300'
-                        : 'bg-gray-900 text-white hover:bg-gray-700'
-                    }`
-                  : `${
-                      isEditingLabel
-                        ? 'bg-red-900 text-gray-300'
-                        : 'bg-red-600 text-white hover:bg-red-700'
-                    } `
+                isEditingLabel || deletingImage
+                  ? 'bg-gray-950 text-gray-300 cursor-not-allowed'
+                  : 'bg-gray-900 text-white hover:bg-gray-700'
               } transition-colors shadow-[4px_4px_0px_0px_#030712] w-full border border-gray-950`}
               aria-label='Close image preview '
-              disabled={isEditingLabel}
+              disabled={isEditingLabel || deletingImage}
             >
               Close
             </button>

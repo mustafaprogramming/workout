@@ -14,6 +14,8 @@ import { formatTime, runWithTimeout } from '../util/utils'
 import RestTimerModal from '../components/RestTimerModal'
 import { useMessage } from '../context/MessageContext'
 import Modal from '../components/Modal' // Import the Modal component
+import { FcAlarmClock } from 'react-icons/fc'
+import { FaHourglassStart, FaPlus, FaStopwatch } from 'react-icons/fa'
 
 export default function WorkoutPlanPage() {
   const { db, userId, isAuthReady } = useFirebase()
@@ -254,14 +256,19 @@ export default function WorkoutPlanPage() {
                   e.stopPropagation()
                   setShowMiniStopwatch(showMiniStopwatch ? false : true)
                 }}
-                className={` px-3 py-1 sm:px-1.5 sm:py-0.5 md:px-3 md:py-1 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 bg-gray-900 text-white rounded-md hover:bg-gray-800 ml-auto transition-colors`}
+                className={` px-3 py-1 sm:px-1.5 sm:py-0.5 md:px-3 md:py-1 shadow-[3px_3px_0px_0px_#030712] border border-gray-950  text-white rounded-md  ml-auto transition-colors flex items-center gap-1 ${
+                  showMiniStopwatch
+                    ? 'hover:bg-yellow-400 bg-yellow-500 '
+                    : 'bg-gray-900 hover:bg-gray-800'
+                }`}
                 aria-label={
                   showMiniStopwatch
                     ? 'Hide floating stopwatch'
                     : 'Show floating stopwatch'
                 }
               >
-                {showMiniStopwatch ? 'Hide' : 'Show'} Mini
+                Mini
+                <FaStopwatch />
               </button>
             </div>
           </div>
@@ -372,14 +379,16 @@ export default function WorkoutPlanPage() {
                 }}
                 className={`${
                   countdownTime == 0 && 'hidden'
-                } px-3 py-1 sm:px-1.5 sm:py-0.5 md:px-3 md:py-1 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 bg-gray-900 text-white rounded-md hover:bg-gray-800 ml-auto transition-colors`}
+                } px-3 py-1 sm:px-1.5 sm:py-0.5 md:px-3 md:py-1 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 bg-gray-900 text-white rounded-md hover:bg-gray-800 ml-auto transition-colors flex items-center gap-1 ${
+                  showMiniCountdown ?  'hover:bg-yellow-400 bg-yellow-500 ':'bg-gray-900 hover:bg-gray-800'
+                }`}
                 aria-label={
                   showMiniCountdown
                     ? 'Hide floating countdown timer'
                     : 'Show floating countdown timer'
                 }
               >
-                {showMiniCountdown ? 'Hide' : 'Show'} Mini
+                Mini <FaHourglassStart />
               </button>
             </div>
           </div>
@@ -399,33 +408,33 @@ export default function WorkoutPlanPage() {
         <div className='grid md:grid-cols-5 sm:grid-cols-4 xs:grid-cols-3 grid-cols-2 gap-2 my-4  text-nowrap'>
           <button
             onClick={() => startRestTimer(60)}
-            className='bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm shadow-[2px_2px_0px_0px_#030712] border border-gray-950'
+            className='bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm shadow-[2px_2px_0px_0px_#030712] border border-gray-950 flex gap-1 justify-center items-center'
           >
-            ⏱️ 1min
+            <FcAlarmClock /> 1min
           </button>
           <button
             onClick={() => startRestTimer(90)}
-            className='bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm shadow-[2px_2px_0px_0px_#030712] border border-gray-950'
+            className='bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm shadow-[2px_2px_0px_0px_#030712] border border-gray-950 flex gap-1 justify-center items-center'
           >
-            ⏱️ 1min 30sec
+            <FcAlarmClock /> 1min 30sec
           </button>
           <button
             onClick={() => startRestTimer(120)}
-            className='bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm shadow-[2px_2px_0px_0px_#030712] border border-gray-950'
+            className='bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm shadow-[2px_2px_0px_0px_#030712] border border-gray-950 flex gap-1 justify-center items-center'
           >
-            ⏱️ 2min
+            <FcAlarmClock /> 2min
           </button>
           <button
             onClick={() => startRestTimer(150)}
-            className='bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm shadow-[2px_2px_0px_0px_#030712] border border-gray-950'
+            className='bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm shadow-[2px_2px_0px_0px_#030712] border border-gray-950 flex gap-1 justify-center items-center'
           >
-            ⏱️ 2min 30sec
+            <FcAlarmClock /> 2min 30sec
           </button>
           <button
             onClick={() => startRestTimer(180)}
-            className='bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm shadow-[2px_2px_0px_0px_#030712] border border-gray-950 col-span-full xs:col-span-2 sm:col-span-full md:col-span-1'
+            className='bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm shadow-[2px_2px_0px_0px_#030712] border border-gray-950 col-span-full xs:col-span-2 sm:col-span-full md:col-span-1 flex gap-1 justify-center items-center'
           >
-            ⏱️ 3min
+            <FcAlarmClock /> 3min
           </button>
         </div>
       </section>
@@ -476,9 +485,9 @@ export default function WorkoutPlanPage() {
       </section>
       <button
         onClick={handleAddPlan}
-        className='px-2 py-1 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 mb-4 text-center w-full'
+        className='px-2 py-1 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 mb-4 text-center w-full flex gap-2 items-center justify-center'
       >
-        ➕ Add New Plan
+        <FaPlus /> Add New Plan
       </button>
 
       {/* Confirmation Modal for deleting a plan */}

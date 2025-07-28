@@ -1,5 +1,7 @@
 // components/RestTimerModal.jsx
 import { useEffect, useRef, useState } from 'react'
+import { FaHourglassStart } from 'react-icons/fa'
+import { FcAlarmClock } from 'react-icons/fc'
 
 export default function RestTimerModal({ seconds, onClose }) {
   const [remaining, setRemaining] = useState(seconds)
@@ -52,9 +54,17 @@ export default function RestTimerModal({ seconds, onClose }) {
       >
         <h2
           id='rest-timer-title'
-          className='text-2xl font-bold mb-2 text-blue-400'
+          className='text-2xl font-bold mb-2 text-white'
         >
-          {remaining === 0 ? "⏰ TIME'S UP!" : '⏳ Rest Timer'}
+          {remaining === 0 ? (
+            <span className='flex gap-2 items-center justify-center'>
+              <FcAlarmClock /> TIME'S UP!
+            </span>
+          ) : (
+            <span className='flex gap-2 items-center justify-center'>
+              <FaHourglassStart /> Rest Timer
+            </span>
+          )}
         </h2>
         <p className='text-4xl font-mono mb-4'>{formatTime(remaining)}</p>
         <p className='mb-4 text-gray-300'>
@@ -63,7 +73,7 @@ export default function RestTimerModal({ seconds, onClose }) {
 
         <button
           onClick={onClose}
-          className='bg-white text-gray-900 px-4 py-2 rounded font-bold hover:bg-gray-200 transition shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
+          className='bg-white text-gray-900 px-4 py-2 rounded font-bold hover:bg-blue-200 transition shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
           aria-label='Close rest timer'
         >
           Close

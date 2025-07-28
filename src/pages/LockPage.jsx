@@ -7,13 +7,11 @@ import {
   signOut,
 } from 'firebase/auth'
 import Modal from '../components/Modal' // Assuming you have a Modal component
+import { FaKey, FaLockOpen, FaSignOutAlt } from 'react-icons/fa'
+import { FcLock } from "react-icons/fc";
 
 export default function LockPage({ onUnlock }) {
-  const {
-    auth,
-    userId,
-    userEmail: firebaseUserEmail,
-  } = useFirebase()
+  const { auth, userId, userEmail: firebaseUserEmail } = useFirebase()
   const { setMessage, setMessageType } = useMessage()
 
   const [password, setPassword] = useState('')
@@ -79,10 +77,14 @@ export default function LockPage({ onUnlock }) {
   }, [userId])
 
   return (
-    <div className='fixed top-0 left-0 flex flex-col items-center justify-center h-screen w-screen z-[1000] text-gray-100 bg-gray-900 '>
-      <div className='bg-gray-900 p-2 text-gray-100 flex flex-col items-center justify-center w-full xs:w-[500px] text-center'>
-        <h2 className='text-2xl font-bold text-blue-400 mb-6 '>
-          🔐 App Locked
+    <div className='fixed top-0 left-0 flex flex-col items-center justify-center h-screen w-screen z-[1000] text-gray-100 bg-gray-950 '>
+      <div className='bg-gray-950 p-2 text-gray-100 flex flex-col items-center justify-center w-full xs:w-[500px] text-center'>
+        <h2 className='text-2xl font-bold text-blue-400 mb-6 flex gap-1 items-end justify-center'>
+          <div className='flex items-center gap-1 text-gray-300 relative'>
+            <FcLock className='text-4xl ' />
+            <FaKey className='text-base text-[#EBA300] absolute right-0 bottom-0 translate-x-[2px] -translate-y-1/2 -rotate-45' />
+          </div>
+          App Locked
         </h2>
         <p className='text-gray-300 mb-4 w-full max-w-[80vw] '>
           Please enter your password to unlock the app.
@@ -100,7 +102,7 @@ export default function LockPage({ onUnlock }) {
           placeholder='Your Password'
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className='p-3 w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 mb-4 '
+          className='p-3 w-full bg-gray-950 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 mb-4 '
           aria-label='Enter your password'
         />
 
@@ -112,18 +114,20 @@ export default function LockPage({ onUnlock }) {
 
         <button
           onClick={handleUnlock}
-          className='w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950 mb-3'
+          className='w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950 mb-3 flex gap-2 items-center justify-center'
           aria-label='Unlock app'
         >
-          Unlock
+          
+          Unlock<FaLockOpen />
         </button>
 
         <button
           onClick={() => setShowConfirmSignOutModal(true)}
-          className='w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950'
+          className='w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950 flex gap-2 items-center justify-center'
           aria-label='Sign out'
         >
           Sign Out
+          <FaSignOutAlt />
         </button>
       </div>
 

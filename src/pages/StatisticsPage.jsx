@@ -5,6 +5,7 @@ import { onSnapshot, collection } from 'firebase/firestore'
 import { useMessage } from '../context/MessageContext'
 import { useNavigation } from '../context/NavigationContext'
 import { ROUTES } from '../route'
+import { GrGallery } from "react-icons/gr";
 
 export default function StatisticsPage() {
   const { db, userId, isAuthReady } = useFirebase()
@@ -139,10 +140,10 @@ export default function StatisticsPage() {
       {/* gallery button */}
       <button
         onClick={() => setCurrentPage(ROUTES.galleryPage)}
-        className='px-6 py-3 w-full bg-gray-900 text-gray-100 rounded-lg hover:bg-gray-700  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 mb-6 text-center'
+        className='px-6 py-3 w-full bg-gray-900 text-gray-100 rounded-lg hover:bg-gray-700  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 mb-6 text-center flex gap-2 items-center justify-center'
         aria-label='Back to calendar page'
       >
-        Visit Gallery 📸
+        <GrGallery/> Visit Gallery
       </button>
       <section className='mb-8 bg-gray-900 border border-gray-950 shadow-[5px_5px_0px_0px_#030712] sm:p-4 p-2.5 rounded-lg '>
         <h3 className='sm:text-xl text-lg font-semibold text-gray-200 sm:mb-3 mb-1.5'>
