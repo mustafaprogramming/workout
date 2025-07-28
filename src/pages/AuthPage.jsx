@@ -10,6 +10,7 @@ import { FaEye, FaEyeSlash } from 'react-icons/fa'
 import { FaSignInAlt, FaUserPlus } from 'react-icons/fa'
 
 export default function AuthPage() {
+  const randomSuffix = Math.random().toString(36).substring(2, 8)
   const { auth } = useFirebase()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -109,9 +110,10 @@ export default function AuthPage() {
           <input
             type='email'
             placeholder='Email'
-            autoComplete='email'
             aria-required='true'
             aria-label='Email address'
+            name={`email_${randomSuffix}`}
+            autoComplete="new-password-2"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className='px-2 py-1.5 sm:p-3 w-full  bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950  rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 text-sm sm:text-base'
@@ -123,7 +125,8 @@ export default function AuthPage() {
               placeholder='Password'
               aria-required='true'
               aria-label='Password'
-              autoComplete='password'
+              name={`password_${randomSuffix}`}
+              autoComplete="new-password-3"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className='px-2 py-1.5 sm:p-3 w-full  bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950  rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 pr-10 text-sm sm:text-base'
@@ -146,7 +149,8 @@ export default function AuthPage() {
                 aria-required='true'
                 value={confirmPassword}
                 aria-label='Confirm password'
-                autoComplete='password'
+                name={`confirm_password_${randomSuffix}`}
+                autoComplete="new-password-4"
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className='px-2 py-1.5 sm:p-3 w-full bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 pr-10 text-sm sm:text-base'
                 disabled={loading}

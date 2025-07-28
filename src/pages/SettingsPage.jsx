@@ -34,6 +34,7 @@ import {
 } from '../components/ClearingStorageAnimation'
 
 export default function SettingsPage() {
+  const randomSuffix = Math.random().toString(36).substring(2, 8)
   const { db, auth, userId, isAuthReady } = useFirebase()
   const { stopTimers } = useTimer()
   const { setMessage, setMessageType } = useMessage()
@@ -60,6 +61,9 @@ export default function SettingsPage() {
   const [showReauthModal, setShowReauthModal] = useState(false)
   const [reauthPassword, setReauthPassword] = useState('')
   const [reauthError, setReauthError] = useState('')
+  const [showClearReauthModal, setShowClearReauthModal] = useState(false)
+  const [clearReauthPassword, setClearReauthPassword] = useState('')
+  const [clearReauthError, setClearReauthError] = useState('')
 
   const appId =
     import.meta.env.VITE_FIREBASE_APP_ID || 'workout-tracker-app-local'
@@ -286,7 +290,7 @@ export default function SettingsPage() {
     }
   }
 
-  const handleClearData = async () => {
+  const executeClearData = async () => {
     if (!db || !userId || !auth) {
       setMessage('Error: Firebase not initialized or user not logged in.')
       setMessageType('error')
@@ -298,7 +302,6 @@ export default function SettingsPage() {
 
     try {
       stopTimers()
-      setClearSpinnerShow()
       await deleteAllUserCloudinaryImages()
 
       const batch = writeBatch(db)
@@ -308,7 +311,6 @@ export default function SettingsPage() {
         'userSettings',
         'measurements',
         'userGalleryImages',
-        'userProfile',
         'workoutPlans',
         'workouts',
       ]
@@ -340,6 +342,7 @@ export default function SettingsPage() {
 
       setMessage('All data cleared successfully!')
       setMessageType('success')
+      return true
     } catch (error) {
       console.error('Error clearing all data:', error.message)
       setMessage(
@@ -350,8 +353,8 @@ export default function SettingsPage() {
         }`
       )
       setMessageType('error')
+      return false
     }
-    setClearSpinnerHide()
   }
 
   const executeAccountAndDataDeletion = async () => {
@@ -428,7 +431,38 @@ export default function SettingsPage() {
       return false
     }
   }
+  const handleClearReauthenticate=async()=>{
+    setClearReauthError('')
+    if (!auth.currentUser || !userEmail || !clearReauthPassword) {
+      setClearReauthError('Please enter your email and password.')
+      return
+    }
 
+    const credential = EmailAuthProvider.credential(userEmail, clearReauthPassword)
+
+    try {
+      await reauthenticateWithCredential(auth.currentUser, credential)
+      setShowClearReauthModal(false)
+      setMessage('User re-authenticated successfully.')
+      setMessageType('success')
+      setClearReauthPassword('')
+      setClearSpinnerShow()
+      await executeClearData()
+    } catch (error) {
+      console.error('Re-authentication failed:', error)
+      let errorMessage = 'Re-authentication failed. Please check your password.'
+      if (
+        error.code === 'auth/wrong-password' ||
+        error.code === 'auth/invalid-credential'
+      ) {
+        errorMessage = 'Incorrect password. Please try again.'
+      } else if (error.code === 'auth/user-not-found') {
+        errorMessage = 'User not found. Please log in again.'
+      }
+      setClearReauthError(errorMessage)
+    }
+    setClearSpinnerHide()
+  }
   const handleReauthenticate = async () => {
     setReauthError('')
     if (!auth.currentUser || !userEmail || !reauthPassword) {
@@ -484,6 +518,17 @@ export default function SettingsPage() {
     setShowConfirmDeleteAccountModal(false)
     setShowReauthModal(true)
   }
+  const handleClearData = async () => {
+    if (!auth || !auth.currentUser || !userEmail) {
+      setMessage('Error: User not logged in or email not available.')
+      setMessageType('error')
+      setShowConfirmClearDataModal(false)
+      return
+    }
+
+    setShowConfirmClearDataModal(false)
+    setShowClearReauthModal(true)
+  }
 
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -517,7 +562,10 @@ export default function SettingsPage() {
                 key={`workout-${index}`}
                 className={`flex items-center sm:space-x-2 space-x-1  py-1 px-2  rounded-md  border border-gray-950 bg-gray-900 ${
                   !editSettings
-                    ? '': isSaveSettings ? "":'hover:shadow-[0px_0px_0px_0px_#030712] cursor-pointer'
+                    ? ''
+                    : isSaveSettings
+                    ? ''
+                    : 'hover:shadow-[0px_0px_0px_0px_#030712] cursor-pointer'
                 } shadow-[5px_5px_0px_0px_#030712] duration-500`}
               >
                 <input
@@ -539,7 +587,7 @@ export default function SettingsPage() {
                   }}
                   className='form-checkbox h-3 w-3 sm:h-5 sm:w-5 text-blue-500 rounded-md bg-gray-700 border-gray-500 checked:bg-blue-500'
                   aria-label={`Toggle ${day} as a workout day`}
-                  disabled={!editSettings||isSaveSettings}
+                  disabled={!editSettings || isSaveSettings}
                 />
                 <span>{day}</span>
               </label>
@@ -571,9 +619,13 @@ export default function SettingsPage() {
                 }))
               } // Update settings directly
               className={`p-1.5 sm:p-3  ${
-                !editSettings ?'bg-gray-900': isSaveSettings?'bg-gray-900':'bg-gray-700'
+                !editSettings
+                  ? 'bg-gray-900'
+                  : isSaveSettings
+                  ? 'bg-gray-900'
+                  : 'bg-gray-700'
               } shadow-[5px_5px_0px_0px_#030712] border border-gray-950 ml-5 max-w-[200px] rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100`}
-              disabled={!editSettings||isSaveSettings}
+              disabled={!editSettings || isSaveSettings}
             />
           </div>
         </fieldset>
@@ -600,7 +652,7 @@ export default function SettingsPage() {
               }}
               className='form-checkbox h-5 w-5 text-blue-500 rounded-md bg-gray-700 border-gray-500  checked:bg-blue-500 ml-4'
               aria-label='Toggle lock protection on app launch'
-              disabled={!editSettings||isSaveSettings}
+              disabled={!editSettings || isSaveSettings}
             />
           </div>
         </fieldset>
@@ -611,7 +663,7 @@ export default function SettingsPage() {
             editSettings
               ? 'hover:bg-green-700 bg-green-600'
               : 'hover:bg-indigo-700 bg-indigo-600'
-          } ${isSaveSettings?'cursor-not-allowed':''} `}
+          } ${isSaveSettings ? 'cursor-not-allowed' : ''} `}
         >
           {editSettings ? (
             <span>
@@ -846,6 +898,8 @@ export default function SettingsPage() {
             type='password'
             placeholder='Your Password'
             value={reauthPassword}
+            name={`password_${randomSuffix}`}
+            autoComplete='new-password'
             onChange={(e) => setReauthPassword(e.target.value)}
             className='px-3 py-2 text-sm sm:text-base w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 mb-4'
           />
@@ -868,7 +922,51 @@ export default function SettingsPage() {
           </div>
         </Modal>
       )}
-      {deletionSpinner && <DeletingAccountAnimation /> }
+      {showClearReauthModal && (
+        <Modal onClose={() => setShowClearReauthModal(false)}>
+          <h3 className='text-lg sm:text-xl font-bold text-blue-400 mb-4 mr-[34px]'>
+            Re-authenticate for Security
+          </h3>
+          <p className='text-gray-200 mb-2 text-sm sm:text-base'>
+            For your security, please re-enter your password to confirm this
+            sensitive action.
+            <span className='mt-2 block'>
+              Email:{' '}
+              <span className='font-mono text-blue-300 mb-2 '>
+                {' '}
+                {userEmail}
+              </span>
+            </span>
+          </p>
+          <input
+            type='password'
+            placeholder='Your Password'
+            value={clearReauthPassword}
+            name={`password_${randomSuffix}`}
+            autoComplete='new-password-5'
+            onChange={(e) => setClearReauthPassword(e.target.value)}
+            className='px-3 py-2 text-sm sm:text-base w-full bg-gray-900 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 mb-4'
+          />
+          {clearReauthError && (
+            <p className='text-red-400 text-sm mb-4'>{clearReauthError}</p>
+          )}
+          <div className='flex gap-3'>
+            <button
+              onClick={() => setShowClearReauthModal(false)}
+              className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-gray-900 text-white rounded-md hover:bg-gray-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950 w-full text-nowrap'
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleClearReauthenticate}
+              className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950 w-full text-nowrap'
+            >
+              Confirm Re-authenticate
+            </button>
+          </div>
+        </Modal>
+      )}
+      {deletionSpinner && <DeletingAccountAnimation />}
       {clearSpinner && <ClearingStorageAnimation />}
     </div>
   )

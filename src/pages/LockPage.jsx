@@ -11,6 +11,7 @@ import { FaKey, FaLockOpen, FaSignOutAlt } from 'react-icons/fa'
 import { FcLock } from "react-icons/fc";
 
 export default function LockPage({ onUnlock }) {
+  const randomSuffix = Math.random().toString(36).substring(2, 8)
   const { auth, userId, userEmail: firebaseUserEmail } = useFirebase()
   const { setMessage, setMessageType } = useMessage()
 
@@ -100,10 +101,12 @@ export default function LockPage({ onUnlock }) {
         <input
           type='password'
           placeholder='Your Password'
+          name={`password_${randomSuffix}`}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className='p-3 w-full bg-gray-950 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 mb-4 '
           aria-label='Enter your password'
+          autoComplete="new-password-1"
         />
 
         {error && (

@@ -474,7 +474,7 @@ export default function GalleryPage() {
             }
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className='flex-grow p-1 px-2 sm:p-2 bg-gray-800 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 text-sm'
+            className='flex-grow p-1 px-2 sm:p-2 bg-gray-800 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 w-full text-sm'
             aria-label={`Enter search term for ${searchType}`}
           />
           {/* Search Type Dropdown */}
