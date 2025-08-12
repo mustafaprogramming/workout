@@ -77,7 +77,7 @@ export default function MeasurementModal({
   }
 
   const handleAddImageField = () => {
-    if (formData.imageUrls.length < 10) {
+    if (formData.imageUrls.length < 15) {
       setFormData((prev) => ({
         ...prev,
         imageUrls: [
@@ -86,7 +86,7 @@ export default function MeasurementModal({
         ],
       }))
     } else {
-      setMessage('Maximum of 10 images allowed.')
+      setMessage('Maximum of 15 images allowed.')
       setMessageType('error')
     }
   }
@@ -186,6 +186,12 @@ export default function MeasurementModal({
     {
       label: 'Forearms (in)',
       key: 'forearms',
+      type: 'number',
+      optional: false,
+    },
+    {
+      label: 'Shoulders (in)',
+      key: 'shoulders',
       type: 'number',
       optional: false,
     },
@@ -442,7 +448,7 @@ export default function MeasurementModal({
               </button>
             </div>
           ))}
-          {formData.imageUrls.length < 10 && (
+          {formData.imageUrls.length < 15 && (
             <button
               onClick={handleAddImageField}
               className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full '

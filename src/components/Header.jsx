@@ -35,7 +35,7 @@ export default function Header() {
         aria-label='App version 1.1.0'
       >
         <span className='text-xs sm:text-sm text-blue-300 font-bold'>v</span>
-        1.2.2
+        1.2.21
       </span>
     </header>
   )

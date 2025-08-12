@@ -87,6 +87,14 @@ export default function MeasurementData({ m }) {
                   </td>
                 </tr>
               )}
+              {m.shoulders && (
+                <tr className='border-b border-gray-500 last:border-b-0'>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>Shoulders</td>
+                  <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>
+                    {m.shoulders} in
+                  </td>
+                </tr>
+              )}
               {m.waist && (
                 <tr className='border-b border-gray-500 last:border-b-0'>
                   <td className='sm:py-2 sm:px-6 py-1 px-3 text-left'>Waist</td>
