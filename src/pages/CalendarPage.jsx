@@ -8,7 +8,7 @@ import { ROUTES } from '../route'
 import { useMessage } from '../context/MessageContext'
 import { FaBackward, FaBan, FaBed, FaCheck, FaForward, FaHourglassHalf, FaSearch, FaTimes } from 'react-icons/fa'
 
-export default function CalendarPage({ setSelectedDate }) {
+export default function CalendarPage({ setSelectedDate,setWorkoutPageActive }) {
   const { db, userId, isAuthReady, userCreatedAt } = useFirebase()
   const { setCurrentPage } = useNavigation()
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -426,6 +426,7 @@ export default function CalendarPage({ setSelectedDate }) {
           onLogWorkout={() => {
             setSelectedDate(selectedDayData.date)
             setCurrentPage(ROUTES.workoutLog)
+            setWorkoutPageActive(true)
             setShowDayActionsModal(false)
           }}
           onConvertDayType={(newType) =>

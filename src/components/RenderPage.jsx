@@ -15,7 +15,7 @@ import PageFallback from '../pages/PageFallback'
 import GalleryPage from '../pages/GalleryPage'
 import { useLockGuard } from '../hooks/LockGuard'
 
-export default function RenderPage() {
+export default function RenderPage({setWorkoutPageActive}) {
   const { userId, isAuthReady, lockProtectionEnabled } = useFirebase()
   const { currentPage, setCurrentPage } = useNavigation()
   const [selectedDate, setSelectedDate] = useState(new Date())
@@ -43,12 +43,13 @@ export default function RenderPage() {
         (() => {
           switch (currentPage) {
             case ROUTES.calendar:
-              return <CalendarPage setSelectedDate={setSelectedDate} />
+              return <CalendarPage setSelectedDate={setSelectedDate} setWorkoutPageActive={setWorkoutPageActive} />
             case ROUTES.workoutLog:
               return (
                 <WorkoutLogPage
                   selectedDate={selectedDate}
                   setCurrentPage={setCurrentPage}
+                  setWorkoutPageActive={setWorkoutPageActive}
                 />
               )
             case ROUTES.measurements:

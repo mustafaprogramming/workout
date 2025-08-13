@@ -3,7 +3,7 @@ import { useFirebase } from '../context/FirebaseContext'
 import { useState, useEffect } from 'react'
 import { formatDate } from '../util/utils'
 import { doc, setDoc, onSnapshot, collection } from 'firebase/firestore'
-import { deleteCloudinaryImage } from '../util/cloudinaryUtils' // Import deleteCloudinaryImage
+import { deleteCloudinaryImage } from '../util/cloudinaryUtils'
 import { useMessage } from '../context/MessageContext'
 import {
   FaBackward,
@@ -12,6 +12,7 @@ import {
   FaPlus,
   FaSearch,
 } from 'react-icons/fa'
+import { getAuth } from 'firebase/auth'
 
 export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
   const { db, userId, isAuthReady } = useFirebase()
@@ -33,6 +34,7 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
       'weight',
       'bodyFat',
       'chest',
+      'shoulders',
       'waist',
       'neck',
       'forearms',
@@ -53,11 +55,11 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
 
     const hasNotes = data.notes && data.notes.trim() !== ''
 
-    const hasImageUrls =
+    const hasImagePublicId =
       data.imageUrls &&
-      data.imageUrls.some((img) => img.url && img.url.trim() !== '')
+      data.imageUrls.some((img) => img.public_id && img.public_id.trim() !== '')
 
-    return !(hasNumericData || hasNotes || hasImageUrls)
+    return !(hasNumericData || hasNotes || hasImagePublicId)
   }
 
   useEffect(() => {
@@ -99,23 +101,32 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
     const dateKey = formatDate(date)
 
     setCurrentMonthData(
-      measurements[dateKey] || {
-        date: dateKey,
-        weight: '',
-        bodyFat: '',
-        chest: '',
-        waist: '',
-        neck: '',
-        forearms: '',
-        shoulders: '',
-        bicep: '',
-        hips: '',
-        quads: '',
-        calves: '',
-        notes: '',
-        imageUrls: [],
-      }
+      measurements[dateKey]
+        ? {
+            ...measurements[dateKey],
+            imageUrls: (measurements[dateKey].imageUrls || []).map((img) => ({
+              label: img.label || '',
+              public_id: img.public_id || null,
+            })),
+          }
+        : {
+            date: dateKey,
+            weight: '',
+            bodyFat: '',
+            chest: '',
+            waist: '',
+            neck: '',
+            forearms: '',
+            shoulders: '',
+            bicep: '',
+            hips: '',
+            quads: '',
+            calves: '',
+            notes: '',
+            imageUrls: [],
+          }
     )
+
     setShowMeasurementModal(true)
   }
 
@@ -297,10 +308,19 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
         <MeasurementModal
           monthData={currentMonthData}
           onClose={() => setShowMeasurementModal(false)}
-          onSave={(data) => {
+          onSave={async (data) => {
             const dateKey = formatDate(new Date(data.date))
-            let savedLocally = false
+            // This is the corrected line to only save label and public_id
+            const sanitizedImageUrls = (data.imageUrls || []).map(
+              ({ label, public_id }) => ({ label, public_id })
+            )
 
+            const sanitizedData = {
+              ...data,
+              imageUrls: sanitizedImageUrls,
+            }
+
+            let savedLocally = false
             const fallbackTimeout = setTimeout(() => {
               if (!savedLocally) {
                 setShowMeasurementModal(false)
@@ -309,13 +329,13 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
               }
             }, 5000)
 
-            setDoc(
+            await setDoc(
               doc(
                 db,
                 `artifacts/${appId}/users/${userId}/measurements`,
                 dateKey
               ),
-              data,
+              sanitizedData,
               { merge: true }
             )
               .then(() => {
@@ -335,7 +355,6 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
           Clearable={!isEmptyMeasurementData(currentMonthData)}
           onClearData={async (dateKey) => {
             let savedLocally = false
-
             const fallbackTimeout = setTimeout(() => {
               if (!savedLocally) {
                 setShowMeasurementModal(false)
@@ -344,7 +363,6 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
               }
             }, 5000)
 
-            // --- NEW: Delete associated Cloudinary images for this month ---
             const dataToClear = measurements[dateKey]
             if (
               dataToClear &&
@@ -354,18 +372,16 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
               const deletePromises = dataToClear.imageUrls.map(async (img) => {
                 if (img.public_id) {
                   try {
-                    await deleteCloudinaryImage(img.public_id)
+                    await deleteCloudinaryImage(img.public_id, dateKey)
                   } catch (e) {
                     console.error(`Error deleting Cloudinary image:`, e)
-                    // Continue even if one image fails to delete
                   }
                 }
               })
-              await Promise.all(deletePromises) // Wait for all deletions to attempt
+              await Promise.all(deletePromises)
             }
-            // --- END NEW ---
 
-            setDoc(
+            await setDoc(
               doc(
                 db,
                 `artifacts/${appId}/users/${userId}/measurements`,

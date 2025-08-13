@@ -1,75 +1,90 @@
 // src/util/cloudinaryUtils.js
 
-// IMPORTANT: Replace with your actual Cloudinary Cloud Name and Upload Preset
-const CLOUDINARY_CLOUD_NAME = 'dgxyblafe' // e.g., 'dwz0s2j2x'
-const CLOUDINARY_UPLOAD_PRESET = 'workout_tracker_unsigned' // e.g., 'workout_tracker_unsigned'
+import { getAuth } from 'firebase/auth'
 
-// Function to upload an image to Cloudinary (remains the same)
-export const uploadImageToCloudinary = async (file, userId) => {
-  const formData = new FormData()
-  formData.append('file', file)
-  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET)
-
+/**
+ * Uploads an image to Cloudinary using a signed upload request.
+ * Automatically fetches the current user's ID token.
+ */
+export const uploadImageToCloudinary = async (file) => {
   try {
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+    const auth = getAuth()
+    const idToken = await auth.currentUser.getIdToken()
+
+    const signResponse = await fetch('/api/signUpload', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`,
+      },
+    })
+
+    if (!signResponse.ok) {
+      const errorData = await signResponse.json()
+      throw new Error(
+        errorData.message || 'Failed to get signed upload signature.'
+      )
+    }
+
+    const { signature, timestamp, public_id, cloudname, api_key } =
+      await signResponse.json()
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('api_key', api_key)
+    formData.append('timestamp', timestamp)
+    formData.append('signature', signature)
+    formData.append('public_id', public_id)
+    formData.append('type', 'authenticated') // must match server signing params
+    formData.append('overwrite', 'true') // must match server signing params
+    formData.append('invalidate', 'true') // must match server signing params
+
+    const uploadResponse = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudname}/image/upload`,
       {
         method: 'POST',
         body: formData,
       }
     )
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error.message || 'Cloudinary upload failed')
+    if (!uploadResponse.ok) {
+      const errorData = await uploadResponse.json()
+      throw new Error(errorData.error?.message || 'Cloudinary upload failed.')
     }
 
-    const data = await response.json();
-    return {
-      url: data.secure_url, // The secure URL of the uploaded image
-      public_id: data.public_id, // Cloudinary's public ID, needed for deletion
-    }
+    return uploadResponse.json()
   } catch (error) {
-    console.error('Error uploading to Cloudinary:', error)
+    console.error('Error in uploadImageToCloudinary:', error)
     throw error
   }
 }
 
-// Function to delete an image from Cloudinary via Vercel Serverless Function
-export const deleteCloudinaryImage = async (publicId) => {
-  if (!publicId) {
-    console.warn('No public_id provided for Cloudinary deletion. Skipping.')
-    return
-  }
-
+/**
+ * Deletes an image from Cloudinary using a signed deletion request.
+ * Automatically fetches the current user's ID token.
+ * This function also sends the docId for server-side ownership verification.
+ */
+export const deleteCloudinaryImage = async (publicId, docId) => {
   try {
-    // Call your Vercel Serverless Function
+    const auth = getAuth()
+    const idToken = await auth.currentUser.getIdToken()
+
     const response = await fetch('/api/deleteImage', {
-      // Path to your Vercel function
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Optional: Add a simple auth token if you implemented it in the Vercel function
-        // 'X-Auth-Token': 'YOUR_VERCEL_AUTH_TOKEN_HERE',
+        Authorization: `Bearer ${idToken}`,
       },
-      body: JSON.stringify({ public_id: publicId }),
+      body: JSON.stringify({ publicId, docId }),
     })
 
-    const data = await response.json()
-
     if (!response.ok) {
-      throw new Error(
-        data.error || 'Failed to delete image via Vercel function.'
-      )
+      const errorData = await response.json()
+      throw new Error(errorData.message || 'Failed to delete image.')
     }
 
-    console.log(`Vercel Function response for deletion of ${publicId}:`, data)
-    return data // Return the data from the function (e.g., { success: true })
+    return response.json()
   } catch (error) {
-    console.error(
-      `Error calling Vercel Function to delete Cloudinary image ${publicId}:`,
-      error
-    )
-    throw error // Re-throw to be handled by the calling component
+    console.error('Error in deleteCloudinaryImage:', error)
+    throw error
   }
 }

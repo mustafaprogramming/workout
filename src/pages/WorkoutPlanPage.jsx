@@ -16,6 +16,7 @@ import { useMessage } from '../context/MessageContext'
 import Modal from '../components/Modal' // Import the Modal component
 import { FcAlarmClock } from 'react-icons/fc'
 import { FaHourglassStart, FaPlus, FaStopwatch } from 'react-icons/fa'
+import { useMemo } from 'react'
 
 export default function WorkoutPlanPage() {
   const { db, userId, isAuthReady } = useFirebase()
@@ -47,7 +48,8 @@ export default function WorkoutPlanPage() {
   const [planToDeleteId, setPlanToDeleteId] = useState(null)
   const [planToDeleteName, setPlanToDeleteName] = useState('')
   // --- END NEW STATE ---
-
+  const [searchTerm, setSearchTerm] = useState('')
+  const [workoutPlanCard, setWorkoutPlanCard] = useState(null)
   const appId =
     import.meta.env.VITE_FIREBASE_APP_ID || 'workout-tracker-app-local'
 
@@ -97,6 +99,7 @@ export default function WorkoutPlanPage() {
         collection(db, `artifacts/${appId}/users/${userId}/workoutPlans`),
         newPlan
       )
+      setWorkoutPlanCard(docRef)
       setEditingPlanId(docRef.id) // Immediately go into edit mode for the new plan
       setTimeout(() => {
         document.getElementById(`${docRef.id}-name-input`).focus()
@@ -128,7 +131,7 @@ export default function WorkoutPlanPage() {
           { name: newName, exercises: updatedExercises }, // Update both name and exercises
           { merge: true }
         ),
-        2000
+        5000
       )
       setMessage(`Workout plan "${newName}" saved successfully!`)
       setMessageType('success')
@@ -144,7 +147,12 @@ export default function WorkoutPlanPage() {
       }
     }
   }
-
+  useEffect(() => {
+    if (workoutPlanCard) {
+      const plan = workoutPlans.find((plan) => plan.id === workoutPlanCard.id)
+      setWorkoutPlanCard(plan)
+    }
+  }, [workoutPlanCard, workoutPlans])
   // --- UPDATED: handleDeletePlan to show confirmation modal ---
   const handleDeletePlan = (planId, planName) => {
     setPlanToDeleteId(planId)
@@ -175,6 +183,7 @@ export default function WorkoutPlanPage() {
       setShowConfirmDeleteModal(false) // Close the modal
       setPlanToDeleteId(null) // Clear ID
       setPlanToDeleteName('') // Clear name
+      
     } catch (e) {
       console.error('Error deleting workout plan:', e)
       setMessage('Failed to delete workout plan.')
@@ -193,7 +202,16 @@ export default function WorkoutPlanPage() {
     setTimerSeconds(duration)
     setShowTimer(true)
   }
-
+  const searchedPlan = useMemo(() => {
+    let filtered = workoutPlans
+    if (searchTerm) {
+      const lowerCaseSearchTerm = searchTerm.toLowerCase()
+      filtered = filtered.filter((plan) =>
+        plan.name.toLowerCase().includes(lowerCaseSearchTerm)
+      )
+    }
+    return filtered
+  }, [workoutPlans, searchTerm])
   return (
     <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-6 xs:p-3 p-2 rounded-xl  text-gray-100'>
       <h2 className='sm:text-2xl text-xl font-bold text-blue-400 mb-6 mt-2'>
@@ -380,7 +398,9 @@ export default function WorkoutPlanPage() {
                 className={`${
                   countdownTime == 0 && 'hidden'
                 } px-3 py-1 sm:px-1.5 sm:py-0.5 md:px-3 md:py-1 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 bg-gray-900 text-white rounded-md hover:bg-gray-800 ml-auto transition-colors flex items-center gap-1 ${
-                  showMiniCountdown ?  'hover:bg-yellow-400 bg-yellow-500 ':'bg-gray-900 hover:bg-gray-800'
+                  showMiniCountdown
+                    ? 'hover:bg-yellow-400 bg-yellow-500 '
+                    : 'bg-gray-900 hover:bg-gray-800'
                 }`}
                 aria-label={
                   showMiniCountdown
@@ -444,51 +464,99 @@ export default function WorkoutPlanPage() {
           onClose={() => setShowTimer(false)}
         />
       )}
+      {workoutPlanCard && (
+        <WorkoutPlanCard
+          planId={workoutPlanCard.id}
+          planName={workoutPlanCard.name}
+          exercises={workoutPlanCard.exercises || []}
+          isEditing={editingPlanId === workoutPlanCard.id}
+          onEditToggle={() =>
+            setEditingPlanId(
+              editingPlanId === workoutPlanCard.id ? null : workoutPlanCard.id
+            )
+          }
+          onSaveExercises={handleSaveWorkoutPlan} // Pass the updated save handler
+          onDeletePlan={(id) => handleDeletePlan(id, workoutPlanCard.name)} // Pass planId and planName to handler
+          aria-label={`Workout plan for ${workoutPlanCard.name}`}
+        />
+      )}
+
       {/* Workout Plans Section */}
+
       <section
-        className='mb-6 bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-[2px] pt-2 sm:pt-4 rounded-lg '
+        className='mb-6 bg-gray-900 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 px-1 xs:px-2 pt-2 sm:pt-4 rounded-lg '
         aria-labelledby='workout-plan-section'
       >
-        <h3
-          id='workout-plan-heading'
-          className='sm:text-xl md:text-2xl text-lg font-semibold text-gray-200 mb-3 px-2 sm:px-4  '
-        >
-          My Workout Plans
-        </h3>
-        {workoutPlans.length === 0 && (
-          <p className='text-gray-300 text-center py-4 bg-gray-700 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 px-8 rounded-md '>
+        <div className='flex items-center justify-between px-2 sm:px-4 mb-3'>
+          <h3
+            id='workout-plan-heading'
+            className='text-base sm:text-xl md:text-2xl xs:text-lg font-semibold text-gray-200   text-nowrap '
+          >
+            My Workout Plans
+          </h3>
+          <button
+            onClick={handleAddPlan}
+            className='px-2 py-1 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950  text-center w-fit flex xs:gap-2 gap-1 items-center justify-center text-xs xs:text-sm sm:text-base'
+          >
+            <FaPlus /> Add Plan
+          </button>
+        </div>
+        {searchedPlan.length === 0 && searchTerm !== '' && (
+          <p className='h-[30vh] text-sm sm:text-base text-gray-300 flex items-center justify-center  py-4 bg-gray-700 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 px-8 rounded-md '>
+            No images match your search term "{searchTerm}".
+          </p>
+        )}
+        {searchedPlan.length === 0 && searchTerm === '' && (
+          <p className='h-[30vh] text-sm sm:text-base text-gray-300 flex items-center justify-center  py-4 bg-gray-700 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 px-8 rounded-md '>
             No workout plans added yet.
             <br /> Click{' '}
             <span className='text-blue-400 text-nowrap'>"Add New Plan"</span> to
             get started!
           </p>
         )}
-        {workoutPlans.length > 0 && (
-          <div className='max-h-[40vh] overflow-y-auto bg-gray-700 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-1 xs:p-2 sm:p-4 rounded-md '>
-            {workoutPlans.map((plan) => (
-              <WorkoutPlanCard
-                key={plan.id}
-                planId={plan.id}
-                planName={plan.name}
-                exercises={plan.exercises || []}
-                isEditing={editingPlanId === plan.id}
-                onEditToggle={() =>
-                  setEditingPlanId(editingPlanId === plan.id ? null : plan.id)
-                }
-                onSaveExercises={handleSaveWorkoutPlan} // Pass the updated save handler
-                onDeletePlan={(id) => handleDeletePlan(id, plan.name)} // Pass planId and planName to handler
-                aria-label={`Workout plan for ${plan.name}`}
-              />
-            ))}
+        {searchedPlan.length > 0 && (
+          <div className='h-[30vh] overflow-y-auto bg-gray-700 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-1 xs:p-2 sm:py-4 rounded-md '>
+            {searchedPlan.map((plan) => {
+              return (
+                <div
+                  key={plan.id}
+                  className='bg-gray-900 shadow-[2px_2px_0px_0px_#030712] xs:shadow-[5px_5px_0px_0px_#030712] border border-gray-950 px-4 py-2 sm:py-4 rounded-lg mb-3 flex justify-between items-center'
+                >
+                  <h4 className='sm:text-base md:text-xl text-sm font-semibold text-blue-300 capitalize flex-grow'>
+                    {plan.name}
+                  </h4>
+                  <button
+                    className={`px-2 sm:py-1 py-0.5 sm:px-4 ${
+                      workoutPlanCard?.id === plan.id
+                        ? 'bg-red-600 hover:bg-red-700'
+                        : 'bg-blue-600 hover:bg-blue-700'
+                    }  text-white rounded-md  transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950 text-xs xs:text-sm sm:text-base`}
+                    onClick={() => {
+                      if (workoutPlanCard?.id === plan.id) {
+                        setWorkoutPlanCard(null)
+                      } else {
+                        setWorkoutPlanCard(plan)
+                      }
+                    }}
+                  >
+                    {workoutPlanCard?.id === plan.id ? 'close' : 'open'}
+                  </button>
+                </div>
+              )
+            })}
           </div>
         )}
+        <div className='flex xs:my-3 my-2 bg-gray-700 shadow-[4px_4px_0px_0px_#030712] border border-gray-950 rounded-md '>
+          <input
+            type={'text'}
+            placeholder={'Enter Name to Search Plan'}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className='flex-grow p-1 px-2 sm:p-2 bg-gray-800 shadow-[4px_4px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 w-full text-sm  xs:m-3  m-1.5'
+            aria-label={`Enter search name for Workout Plan`}
+          />
+        </div>
       </section>
-      <button
-        onClick={handleAddPlan}
-        className='px-2 py-1 sm:px-4 sm:py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 mb-4 text-center w-full flex gap-2 items-center justify-center'
-      >
-        <FaPlus /> Add New Plan
-      </button>
 
       {/* Confirmation Modal for deleting a plan */}
       {showConfirmDeleteModal && (

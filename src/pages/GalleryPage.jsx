@@ -1,15 +1,15 @@
 import { GalleryView } from '../components/GalleryView'
 import { useFirebase } from '../context/FirebaseContext'
-import { useState, useEffect, useMemo } from 'react' // Import useMemo for optimized filtering/sorting
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   collection,
   onSnapshot,
   query,
-  addDoc, // For adding new gallery images
-  deleteDoc, // For deleting gallery images
-  doc, // For referencing specific documents
+  addDoc,
+  deleteDoc,
+  doc,
   updateDoc,
-  getDoc, // NEW: Import updateDoc for updating image labels
+  getDoc,
 } from 'firebase/firestore'
 import { ImagePreviewModalGallery } from '../components/ImagePreviewModal'
 import { useMessage } from '../context/MessageContext'
@@ -19,26 +19,28 @@ import {
 } from '../util/cloudinaryUtils'
 import { ROUTES } from '../route'
 import { useNavigation } from '../context/NavigationContext'
+import { useSignedImages } from '../hooks/useSignedImages'
 import { FaTimes, FaUpload } from 'react-icons/fa'
 
 export default function GalleryPage() {
   const { db, userId, isAuthReady } = useFirebase()
   const { setMessage, setMessageType } = useMessage()
   const { setCurrentPage } = useNavigation()
-  const [galleryImages, setGalleryImages] = useState([]) // All fetched images
+
+  const [galleryImages, setGalleryImages] = useState([])
+  const [imagesWithUrls, setImagesWithUrls] = useState([])
   const [loading, setLoading] = useState(true)
   const [showImagePreview, setShowImagePreview] = useState(false)
-  // --- UPDATED: Store full image data for preview ---
-  const [previewImageData, setPreviewImageData] = useState(null) // Stores the full image object
-  // --- END UPDATED ---
+  const [previewImageData, setPreviewImageData] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [fileToUpload, setFileToUpload] = useState(null)
   const [newImageLabel, setNewImageLabel] = useState('')
   const [previewFileUrl, setPreviewFileUrl] = useState(null)
+  const [imagesLoaded, setImagesLoaded] = useState(false)
 
-  const [searchType, setSearchType] = useState('label') // 'label' or 'date'
+  const [searchType, setSearchType] = useState('label')
   const [searchTerm, setSearchTerm] = useState('')
-  const [sortOrder, setSortOrder] = useState('newest') // 'newest' or 'oldest'
+  const [sortOrder, setSortOrder] = useState('newest')
 
   const appId =
     import.meta.env.VITE_FIREBASE_APP_ID || 'workout-tracker-app-local'
@@ -65,74 +67,62 @@ export default function GalleryPage() {
     let currentMeasurementImages = []
     let currentGalleryImages = []
 
-    // Helper to merge and update state. Sorting logic will be in useMemo.
     const updateCombinedGallery = (measurements, gallery) => {
       currentMeasurementImages = measurements
-      currentGalleryImages = gallery // Ensure both are updated
+      currentGalleryImages = gallery
       const combined = [...measurements, ...gallery]
       setGalleryImages(combined)
-      setLoading(false)
-      setMessage('Gallery loaded successfully!') // Re-show success message after all data is merged
-      setMessageType('success')
     }
 
-    // Listener for Measurement Images
     const unsubscribeMeasurements = onSnapshot(
       query(measurementsCollectionRef),
       (measurementsSnapshot) => {
         const fetchedMeasurementImages = []
-        measurementsSnapshot.forEach((doc) => {
-          const data = doc.data()
+
+        for (const docSnap of measurementsSnapshot.docs) {
+          const data = docSnap.data()
           if (data.imageUrls && Array.isArray(data.imageUrls)) {
-            const measurementDate = data.date // Assuming 'date' field exists (YYYY-MM-DD)
-            data.imageUrls.forEach((img) => {
-              if (img.url) {
+            const measurementDate = data.date
+            data.imageUrls.forEach((img, i) => {
+              if (img.public_id) {
                 fetchedMeasurementImages.push({
-                  id: img.public_id || `${doc.id}-${img.url}`, // Use public_id if available, otherwise a unique combo
-                  url: img.url,
+                  id: img.public_id || `${docSnap.id}-${i}`,
+                  public_id: img.public_id,
+                  url: null,
                   label: img.label || `Image from ${measurementDate}`,
-                  date: measurementDate, // Store as YYYY-MM-DD string
-                  source: 'measurement', // Identify source
-                  // --- NEW: Add document ID and array index for measurement images ---
-                  docId: doc.id, // The ID of the measurement document
-                  arrayIndex: data.imageUrls.findIndex(
-                    (item) => item.url === img.url
-                  ), // Index within imageUrls array
-                  // --- END NEW ---
+                  date: measurementDate,
+                  source: 'measurement',
+                  docId: docSnap.id,
+                  arrayIndex: i,
                 })
               }
             })
           }
-        })
+        }
         updateCombinedGallery(fetchedMeasurementImages, currentGalleryImages)
       },
       (error) => {
         console.error('Error fetching measurement images for gallery:', error)
         setMessage('Failed to load some gallery images from measurements.')
         setMessageType('error')
-        setLoading(false)
       }
     )
 
-    // Listener for User Gallery Images
     const unsubscribeGallery = onSnapshot(
       query(galleryCollectionRef),
       (gallerySnapshot) => {
-        const fetchedUserGalleryImages = []
-        gallerySnapshot.forEach((doc) => {
-          const data = doc.data()
-          if (data.url) {
-            // Ensure it has a URL
-            fetchedUserGalleryImages.push({
-              id: doc.id, // Firestore document ID is the unique ID for gallery images
-              url: data.url,
-              label: data.label || 'User Uploaded Image',
-              date:
-                data.uploadedAt?.toDate()?.toISOString().split('T')[0] || // Format to YYYY-MM-DD
-                new Date().toISOString().split('T')[0], // Fallback to current date YYYY-MM-DD
-              public_id: data.public_id, // Store public_id for deletion
-              source: 'gallery', // Identify source
-            })
+        const fetchedUserGalleryImages = gallerySnapshot.docs.map((docSnap) => {
+          const data = docSnap.data()
+          return {
+            id: docSnap.id,
+            public_id: data.public_id || null,
+            url: null,
+            label: data.label || 'User Uploaded Image',
+            date:
+              data.uploadedAt?.toDate()?.toISOString().split('T')[0] ||
+              new Date().toISOString().split('T')[0],
+            source: 'gallery',
+            docId: docSnap.id,
           }
         })
         updateCombinedGallery(
@@ -144,20 +134,17 @@ export default function GalleryPage() {
         console.error('Error fetching user gallery images:', error)
         setMessage('Failed to load some gallery images from your uploads.')
         setMessageType('error')
-        setLoading(false)
       }
     )
 
     return () => {
-      unsubscribeMeasurements() // Cleanup measurement listener
-      unsubscribeGallery() // Cleanup gallery listener
+      unsubscribeMeasurements()
+      unsubscribeGallery()
     }
   }, [db, userId, isAuthReady, appId, setMessage, setMessageType])
 
   const filteredAndSortedImages = useMemo(() => {
     let filtered = galleryImages
-
-    // 1. Apply Search Filter based on searchType
     if (searchTerm) {
       const lowerCaseSearchTerm = searchTerm.toLowerCase()
       filtered = filtered.filter((img) => {
@@ -169,27 +156,77 @@ export default function GalleryPage() {
         return true
       })
     }
-
-    // 2. Apply Sort Order
-    const sorted = [...filtered].sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       const dateA = new Date(a.date)
       const dateB = new Date(b.date)
-
-      if (sortOrder === 'newest') {
-        return dateB.getTime() - dateA.getTime() // Newest first
-      } else {
-        return dateA.getTime() - dateB.getTime() // Oldest first
-      }
+      return sortOrder === 'newest' ? dateB - dateA : dateA - dateB
     })
-
-    return sorted
   }, [galleryImages, searchType, searchTerm, sortOrder])
 
+  const allPublicIds = useMemo(() => {
+    return filteredAndSortedImages.map((img) => img.public_id).filter(Boolean)
+  }, [filteredAndSortedImages])
+
+  const allDocIds = useMemo(() => {
+    return filteredAndSortedImages.map((img) => img.docId).filter(Boolean)
+  }, [filteredAndSortedImages])
+
+  const signedUrls = useSignedImages(allPublicIds, allDocIds)
+
+  useEffect(() => {
+    setLoading(true)
+    if (signedUrls && signedUrls.length === allPublicIds.length) {
+      const byPid = new Map()
+      allPublicIds.forEach((pid, i) => byPid.set(pid, signedUrls[i]))
+      const combined = filteredAndSortedImages.map((img) => ({
+        ...img,
+        url: img.public_id ? byPid.get(img.public_id) ?? null : null,
+      }))
+      setImagesWithUrls(combined)
+      if (combined.length == 0) {
+        setLoading(false)
+      }
+    }
+  }, [
+    filteredAndSortedImages,
+    signedUrls,
+    allPublicIds.length,
+    setMessage,
+    setMessageType,
+  ])
+
+  // New useEffect to handle image loading state
+  useEffect(() => {
+    if (imagesLoaded) {
+      setLoading(false)
+      const failedUrls = signedUrls.filter((url) => url === null).length
+      const totalUrls = signedUrls.length
+
+      if (totalUrls === 0) {
+        setMessage('Gallery loaded successfully!')
+        setMessageType('success')
+      } else if (failedUrls === totalUrls) {
+        setMessage(
+          'Gallery loaded with original URLs (signed URLs unavailable).'
+        )
+        setMessageType('warning')
+      } else if (failedUrls > 0) {
+        setMessage(
+          `Gallery loaded! ${
+            totalUrls - failedUrls
+          }/${totalUrls} images using secure URLs.`
+        )
+        setMessageType('success')
+      } else {
+        setMessage('Gallery loaded with secure URLs!')
+        setMessageType('success')
+      }
+    }
+  }, [imagesLoaded, signedUrls])
+
   const handleImageClick = (img) => {
-    // --- UPDATED: Store the entire image object ---
     setPreviewImageData(img)
     setShowImagePreview(true)
-    // --- END UPDATED ---
   }
 
   const handleKeyPress = (e, img) => {
@@ -230,19 +267,16 @@ export default function GalleryPage() {
     setMessageType('info')
 
     try {
-      const uploadResult = await uploadImageToCloudinary(fileToUpload, userId)
+      const uploadResult = await uploadImageToCloudinary(fileToUpload)
       const newGalleryImage = {
-        url: uploadResult.url,
         label: newImageLabel.trim(),
         public_id: uploadResult.public_id,
-        uploadedAt: new Date(), // Timestamp for sorting
+        uploadedAt: new Date(),
       }
-
       await addDoc(
         collection(db, `artifacts/${appId}/users/${userId}/userGalleryImages`),
         newGalleryImage
       )
-
       setMessage('Image uploaded to gallery successfully!')
       setMessageType('success')
       setFileToUpload(null)
@@ -261,42 +295,37 @@ export default function GalleryPage() {
   }
 
   const handleDeleteGalleryImage = async () => {
-    if (!previewImageData || previewImageData.source !== 'gallery') {
-      setMessage(
-        'Cannot delete this image. It is not a user-uploaded gallery image.'
-      )
+    if (!previewImageData) {
+      setMessage('No image selected for deletion.')
       setMessageType('error')
       return
     }
-
     setMessage('Deleting image from gallery...')
     setMessageType('info')
-
     try {
-      // Use previewImageData.id which is the Firestore doc ID for gallery images
-      const imageToDelete = galleryImages.find(
-        (img) => img.id === previewImageData.id && img.source === 'gallery'
-      )
-      if (imageToDelete && imageToDelete.public_id) {
-        await deleteCloudinaryImage(imageToDelete.public_id)
-      } else {
-        console.warn(
-          'No public_id found for gallery image or image not found in state, skipping Cloudinary deletion.'
+      if (previewImageData.public_id && previewImageData.source === 'gallery') {
+        await deleteCloudinaryImage(
+          previewImageData.public_id,
+          previewImageData.docId
         )
       }
 
-      await deleteDoc(
-        doc(
-          db,
-          `artifacts/${appId}/users/${userId}/userGalleryImages`,
-          previewImageData.id
+      if (previewImageData.source === 'gallery') {
+        await deleteDoc(
+          doc(
+            db,
+            `artifacts/${appId}/users/${userId}/userGalleryImages`,
+            previewImageData.id
+          )
         )
-      )
+      } else if (previewImageData.source === 'measurement') {
+        // Handle deletion of measurement images
+      }
 
       setMessage('Image deleted from gallery successfully!')
       setMessageType('success')
-      setShowImagePreview(false) // Close modal after successful deletion
-      setPreviewImageData(null) // Clear preview data
+      setShowImagePreview(false)
+      setPreviewImageData(null)
     } catch (error) {
       console.error('Error deleting gallery image:', error)
       setMessage(`Failed to delete image: ${error.message}`)
@@ -304,68 +333,51 @@ export default function GalleryPage() {
     }
   }
 
-  // --- NEW: Function to handle updating image label ---
   const handleEditImageLabel = async (imageToUpdate, newLabel) => {
     if (!db || !userId || !imageToUpdate || !newLabel.trim()) {
-      setMessage('Invalid data for updating image label.', 'error')
+      setMessage('Invalid data for updating image label.')
       setMessageType('error')
       return
     }
-
-    setMessage('Updating image label...', 'info')
+    setMessage('Updating image label...')
     setMessageType('info')
-
     try {
       if (imageToUpdate.source === 'gallery') {
-        // Update a document in 'userGalleryImages' collection
         const imageDocRef = doc(
           db,
           `artifacts/${appId}/users/${userId}/userGalleryImages`,
           imageToUpdate.id
         )
         await updateDoc(imageDocRef, { label: newLabel })
-        setMessage('Gallery image label updated successfully!', 'success')
+        setMessage('Gallery image label updated successfully!')
         setMessageType('success')
       } else if (imageToUpdate.source === 'measurement') {
-        // Update an item within the 'imageUrls' array of a 'measurement' document
-        // This requires fetching the document, updating the array, and then saving the document.
         const measurementDocRef = doc(
           db,
           `artifacts/${appId}/users/${userId}/measurements`,
-          imageToUpdate.docId // Use the stored measurement document ID
+          imageToUpdate.docId
         )
         const measurementSnap = await getDoc(measurementDocRef)
-
         if (measurementSnap.exists()) {
           const measurementData = measurementSnap.data()
-          const updatedImageUrls = measurementData.imageUrls.map((img, idx) => {
-            if (idx === imageToUpdate.arrayIndex) {
-              // Match by index
-              return { ...img, label: newLabel }
-            }
-            return img
-          })
+          const updatedImageUrls = measurementData.imageUrls.map((img, idx) =>
+            idx === imageToUpdate.arrayIndex ? { ...img, label: newLabel } : img
+          )
           await updateDoc(measurementDocRef, { imageUrls: updatedImageUrls })
-          setMessage('Measurement image label updated successfully!', 'success')
+          setMessage('Measurement image label updated successfully!')
           setMessageType('success')
         } else {
-          setMessage('Measurement document not found for image.', 'error')
+          setMessage('Measurement document not found for image.')
           setMessageType('error')
         }
-      } else {
-        setMessage('Unknown image source, cannot update label.', 'error')
-        setMessageType('error')
       }
-
-      // After successful update, update the preview data to reflect the change immediately
       setPreviewImageData((prev) => ({ ...prev, label: newLabel }))
     } catch (error) {
       console.error('Error updating image label:', error)
-      setMessage(`Failed to update image label: ${error.message}`, 'error')
+      setMessage(`Failed to update image label: ${error.message}`)
       setMessageType('error')
     }
   }
-  // --- END NEW ---
 
   return (
     <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-6 xs:p-3 p-2 rounded-xl text-gray-100 min-h-[calc(100vh-120px)]'>
@@ -387,7 +399,7 @@ export default function GalleryPage() {
               Select Image:
             </label>
             {previewFileUrl ? (
-              <div className='relative max-h-[250px] max-w-[250px] rounded-md overflow-hidden border border-blue-500 flex-shrink-0  group'>
+              <div className='relative max-h-[250px] max-w-[250px] rounded-md overflow-hidden border border-blue-500 flex-shrink-0 group'>
                 <img
                   src={previewFileUrl}
                   alt='Preview'
@@ -395,11 +407,13 @@ export default function GalleryPage() {
                 />
                 <button
                   onClick={() => handleFileChange({ target: { files: [] } })}
-                  className={`absolute top-0 right-0 bg-red-600 text-white w-6 h-6 lg:w-full lg:h-full flex items-center justify-center rounded-bl-lg lg:rounded-none lg:text-3xl lg:group-hover:opacity-70 lg:opacity-0 ${uploading&&'cursor-not-allowed'}`}
+                  className={`absolute top-0 right-0 bg-red-600 text-white w-6 h-6 lg:w-full lg:h-full flex items-center justify-center rounded-bl-lg lg:rounded-none lg:text-3xl lg:group-hover:opacity-70 lg:opacity-0 ${
+                    uploading && 'cursor-not-allowed'
+                  }`}
                   aria-label='Remove selected image preview'
                   disabled={uploading}
                 >
-                  <FaTimes/>
+                  <FaTimes />
                 </button>
               </div>
             ) : (
@@ -474,7 +488,7 @@ export default function GalleryPage() {
             }
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className='flex-grow p-1 px-2 sm:p-2 bg-gray-800 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 w-full text-sm'
+            className='flex-grow p-1 px-2 sm:p-2 bg-gray-800 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 w-full text-sm  '
             aria-label={`Enter search term for ${searchType}`}
           />
           {/* Search Type Dropdown */}
@@ -482,7 +496,7 @@ export default function GalleryPage() {
             value={searchType}
             onChange={(e) => {
               setSearchType(e.target.value)
-              setSearchTerm('') // Clear search term when changing search type
+              setSearchTerm('')
             }}
             className='p-1 sm:p-2 bg-gray-800 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 text-sm sm:w-auto'
             aria-label='Select search type'
@@ -502,60 +516,55 @@ export default function GalleryPage() {
           </select>
         </div>
       </section>
-
       {loading && (
+        <p className="text-lg font-semibold text-center text-gray-400 my-[20px] after:content-['.'] after:animate-dots ">
+          Loading Images
+          <span className='sr-only'>loading</span>
+        </p>
+      )}
+      {!loading && imagesWithUrls.length === 0 && searchTerm === '' && (
         <p className='text-center text-gray-400 mb-[150px]'>
-          Loading images...
+          No images found yet. Add some from the{' '}
+          <button
+            onClick={() => setCurrentPage(ROUTES.measurements)}
+            className='font-semibold text-blue-300'
+          >
+            Measurements
+          </button>{' '}
+          tab or upload directly here!
         </p>
       )}
 
-      {!loading &&
-        filteredAndSortedImages.length === 0 &&
-        searchTerm === '' && (
-          <p className='text-center text-gray-400 mb-[150px]'>
-            No images found yet. Add some from the{' '}
-            <button
-              onClick={() => setCurrentPage(ROUTES.measurements)}
-              className='font-semibold text-blue-300'
-            >
-              Measurements
-            </button>{' '}
-            tab or upload directly here!
-          </p>
-        )}
+      {!loading && imagesWithUrls.length === 0 && searchTerm !== '' && (
+        <p className='text-center text-gray-400 mb-[150px]'>
+          No images match your search term "{searchTerm}".
+        </p>
+      )}
 
-      {!loading &&
-        filteredAndSortedImages.length === 0 &&
-        searchTerm !== '' && (
-          <p className='text-center text-gray-400 mb-[150px]'>
-            No images match your search term "{searchTerm}".
-          </p>
-        )}
-
-      {!loading && filteredAndSortedImages.length > 0 && (
+      {imagesWithUrls.length > 0 && (
         <GalleryView
-          filteredAndSortedImages={filteredAndSortedImages}
+          filteredAndSortedImages={imagesWithUrls}
           handleImageClick={handleImageClick}
           handleKeyPress={handleKeyPress}
+          onImagesLoaded={() => setImagesLoaded(true)}
         />
       )}
 
-      {showImagePreview &&
-        previewImageData && ( // Ensure previewImageData exists
-          <ImagePreviewModalGallery
-            imageDate={new Date(previewImageData.date).toLocaleDateString()} // Format date for display
-            imageUrl={previewImageData.url}
-            imageLabel={previewImageData.label}
-            canDelete={previewImageData.source === 'gallery'}
-            onDeleteImage={handleDeleteGalleryImage}
-            onClose={() => {
-              setShowImagePreview(false)
-              setPreviewImageData(null) // Clear preview data on close
-            }}
-            imageData={previewImageData} // Pass the full image data
-            onEditLabel={handleEditImageLabel} // Pass the new edit function
-          />
-        )}
+      {showImagePreview && previewImageData && (
+        <ImagePreviewModalGallery
+          imageDate={new Date(previewImageData.date).toLocaleDateString()}
+          imageUrl={previewImageData.url}
+          imageLabel={previewImageData.label}
+          canDelete={previewImageData.source === 'gallery'}
+          onDeleteImage={handleDeleteGalleryImage}
+          onClose={() => {
+            setShowImagePreview(false)
+            setPreviewImageData(null)
+          }}
+          imageData={previewImageData}
+          onEditLabel={handleEditImageLabel}
+        />
+      )}
     </div>
   )
 }

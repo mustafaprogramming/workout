@@ -1,24 +1,30 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 
 export function GalleryView({
   filteredAndSortedImages,
   handleImageClick,
   handleKeyPress,
+  onImagesLoaded,
 }) {
+  const [imagesLoadedCount, setImagesLoadedCount] = useState(0)
   const [imageSize, setImageSize] = useState()
+  const [imageSrcs, setImageSrcs] = useState({}) // NEW: track URLs per id
   const galleryContainer = useRef(null)
+
   const getGalleryContainerWidth = () => {
     const galleryCon = window.getComputedStyle(galleryContainer.current)
     const NoOfColumns = galleryCon.gridTemplateColumns.split(' ').length
     const NoOfGaps = NoOfColumns - 1
     const columnGap = parseFloat(galleryCon.columnGap)
     const NoOfGapPixel = NoOfGaps * columnGap
-    const paddingLeft=parseFloat(galleryCon.paddingLeft)
-    const paddingRight=parseFloat(galleryCon.paddingRight)
-    const widthWithoutGap = parseFloat(galleryCon.width) - NoOfGapPixel - paddingLeft - paddingRight
+    const paddingLeft = parseFloat(galleryCon.paddingLeft)
+    const paddingRight = parseFloat(galleryCon.paddingRight)
+    const widthWithoutGap =
+      parseFloat(galleryCon.width) - NoOfGapPixel - paddingLeft - paddingRight
     const size = widthWithoutGap / NoOfColumns
-    setImageSize(size);
+    setImageSize(size)
   }
+
   useEffect(() => {
     getGalleryContainerWidth()
     window.addEventListener('resize', getGalleryContainerWidth)
@@ -26,6 +32,40 @@ export function GalleryView({
       window.removeEventListener('resize', getGalleryContainerWidth)
     }
   }, [])
+
+  useEffect(() => {
+    setImagesLoadedCount(0)
+    const newSrcs = {}
+    filteredAndSortedImages.forEach((img) => {
+      newSrcs[img.id] = img.url // initialize
+    })
+    setImageSrcs(newSrcs)
+  }, [filteredAndSortedImages])
+
+  useEffect(() => {
+    if (
+      imagesLoadedCount > 0
+    ) {
+      onImagesLoaded()
+    }
+  }, [imagesLoadedCount, filteredAndSortedImages, onImagesLoaded])
+
+  const handleImageLoad = useCallback(() => {
+    setImagesLoadedCount((prev) => prev + 1)
+  }, [])
+
+  // NEW: update imageSrcs when props.url changes (URL refresh)
+  useEffect(() => {
+    setImageSrcs((prev) => {
+      const updated = { ...prev }
+      filteredAndSortedImages.forEach((img) => {
+        if (img.url && img.url !== prev[img.id]) {
+          updated[img.id] = img.url
+        }
+      })
+      return updated
+    })
+  }, [filteredAndSortedImages])
 
   return (
     <div
@@ -44,8 +84,9 @@ export function GalleryView({
           style={{ width: `${imageSize}px` }}
         >
           <img
-            src={img.url}
+            src={imageSrcs[img.id]} // use local state
             alt={img.label}
+            onLoad={handleImageLoad}
             className='w-full object-cover rounded-md mb-1 transition-transform duration-300 group-hover:scale-105'
             onError={(e) => {
               e.target.onerror = null

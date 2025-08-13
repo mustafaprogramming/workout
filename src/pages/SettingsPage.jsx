@@ -242,8 +242,9 @@ export default function SettingsPage() {
   }
 
   const deleteAllUserCloudinaryImages = async () => {
-    const publicIdsToDelete = []
+    const imagesToDelete = [] // { public_id, docId, collectionPath }
 
+    // Measurements images
     const measurementsCollectionRef = collection(
       db,
       `artifacts/${appId}/users/${userId}/measurements`
@@ -254,12 +255,16 @@ export default function SettingsPage() {
       if (data.imageUrls && Array.isArray(data.imageUrls)) {
         data.imageUrls.forEach((img) => {
           if (img.public_id) {
-            publicIdsToDelete.push(img.public_id)
+            imagesToDelete.push({
+              public_id: img.public_id,
+              docId: docSnap.id,
+            })
           }
         })
       }
     })
 
+    // Gallery images
     const galleryCollectionRef = collection(
       db,
       `artifacts/${appId}/users/${userId}/userGalleryImages`
@@ -268,23 +273,36 @@ export default function SettingsPage() {
     gallerySnapshot.forEach((docSnap) => {
       const data = docSnap.data()
       if (data.public_id) {
-        publicIdsToDelete.push(data.public_id)
+        imagesToDelete.push({
+          public_id: data.public_id,
+          docId: docSnap.id,
+        })
       }
     })
 
-    if (publicIdsToDelete.length > 0) {
+    if (imagesToDelete.length > 0) {
       console.log(
-        `Attempting to delete ${publicIdsToDelete.length} images from Cloudinary.`
+        `Attempting to delete ${imagesToDelete.length} images from Cloudinary & Firestore.`
       )
-      const deletePromises = publicIdsToDelete.map(async (publicId) => {
-        try {
-          await deleteCloudinaryImage(publicId)
-        } catch (e) {
-          console.error(`Error deleting Cloudinary image:`, e)
+
+      const deletePromises = imagesToDelete.map(
+        async ({ public_id, docId }) => {
+          try {
+            // 1. Delete from Cloudinary
+            await deleteCloudinaryImage(public_id, docId)
+          } catch (e) {
+            console.error(
+              `Error deleting image (public_id: ${public_id}, docId: ${docId}):`,
+              e
+            )
+          }
         }
-      })
+      )
+
       await Promise.all(deletePromises)
-      console.log('Finished attempting to delete all user Cloudinary images.')
+      console.log(
+        'Finished attempting to delete all user Cloudinary images and Firestore docs.'
+      )
     } else {
       console.log('No Cloudinary images found to delete for this user.')
     }
@@ -431,14 +449,17 @@ export default function SettingsPage() {
       return false
     }
   }
-  const handleClearReauthenticate=async()=>{
+  const handleClearReauthenticate = async () => {
     setClearReauthError('')
     if (!auth.currentUser || !userEmail || !clearReauthPassword) {
       setClearReauthError('Please enter your email and password.')
       return
     }
 
-    const credential = EmailAuthProvider.credential(userEmail, clearReauthPassword)
+    const credential = EmailAuthProvider.credential(
+      userEmail,
+      clearReauthPassword
+    )
 
     try {
       await reauthenticateWithCredential(auth.currentUser, credential)

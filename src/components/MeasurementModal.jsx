@@ -1,14 +1,16 @@
+import React, { useState, useMemo } from 'react'
 import ImagePreviewModal from './ImagePreviewModal'
 import Modal from './Modal'
-import { useState } from 'react'
 import { useFirebase } from '../context/FirebaseContext'
 import {
   uploadImageToCloudinary,
   deleteCloudinaryImage,
 } from '../util/cloudinaryUtils'
-import { doc, setDoc } from 'firebase/firestore' // Import setDoc and doc
+import { doc, setDoc } from 'firebase/firestore'
 import { useMessage } from '../context/MessageContext'
 import { FaBroom, FaMinus, FaPlus, FaSave } from 'react-icons/fa'
+import { useSignedImages } from '../hooks/useSignedImages'
+import { GalleryView } from './GalleryView'
 
 export default function MeasurementModal({
   monthData,
@@ -23,20 +25,30 @@ export default function MeasurementModal({
 
   const [formData, setFormData] = useState(() => {
     const initialData = monthData || {}
+    // Ensure imageUrls is an array of objects with public_id and label
+    const initialImageUrls = initialData.imageUrls
+      ? initialData.imageUrls.map((img) => ({
+          ...img,
+          file: null,
+          url: null,
+          uploading: false,
+          progress: 0,
+        }))
+      : []
     return {
       ...initialData,
-      imageUrls:
-        initialData.imageUrls && Array.isArray(initialData.imageUrls)
-          ? initialData.imageUrls.map((img) => ({
-              ...img,
-              file: null,
-              uploading: false,
-              progress: 0,
-            }))
-          : [{ url: '', label: '', file: null, uploading: false, progress: 0 }],
+      imageUrls: initialImageUrls,
+      notes: initialData.notes || '',
     }
   })
 
+  const publicIds = useMemo(
+    () => formData.imageUrls.map((img) => img.public_id).filter(Boolean),
+    [formData.imageUrls]
+  )
+  const signedUrls = formData?.date
+    ? useSignedImages(publicIds, formData.date)
+    : []
   const [showImagePreview, setShowImagePreview] = useState(false)
   const [previewImageUrl, setPreviewImageUrl] = useState('')
   const [previewImageLabel, setPreviewImageLabel] = useState('')
@@ -45,15 +57,16 @@ export default function MeasurementModal({
   const [uploadingOverall, setUploadingOverall] = useState(false)
   const [clearingOverall, setClearingOverall] = useState(false)
 
+  // ---------- handlers ----------
   const handleFieldChange = (e) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleImageURLChange = (index, field, value) => {
+  const handleImageLabelChange = (index, value) => {
     setFormData((prev) => {
       const updatedUrls = [...prev.imageUrls]
-      updatedUrls[index] = { ...updatedUrls[index], [field]: value }
+      updatedUrls[index] = { ...updatedUrls[index], label: value }
       return { ...prev, imageUrls: updatedUrls }
     })
   }
@@ -63,9 +76,12 @@ export default function MeasurementModal({
     if (file) {
       setFormData((prev) => {
         const updatedUrls = [...prev.imageUrls]
+        if (updatedUrls[index].url) {
+          URL.revokeObjectURL(updatedUrls[index].url)
+        }
         updatedUrls[index] = {
           ...updatedUrls[index],
-          file: file,
+          file,
           url: URL.createObjectURL(file),
           uploading: false,
           progress: 0,
@@ -82,7 +98,14 @@ export default function MeasurementModal({
         ...prev,
         imageUrls: [
           ...prev.imageUrls,
-          { url: '', label: '', file: null, uploading: false, progress: 0 },
+          {
+            label: '',
+            public_id: null,
+            file: null,
+            url: null,
+            uploading: false,
+            progress: 0,
+          },
         ],
       }))
     } else {
@@ -93,52 +116,29 @@ export default function MeasurementModal({
 
   const handleRemoveImageField = async (indexToRemove) => {
     const imageToRemove = formData.imageUrls[indexToRemove]
-    // Create the new array of image URLs *before* any async operations
     const updatedImageUrlsLocally = formData.imageUrls.filter(
       (_, i) => i !== indexToRemove
     )
 
-    let deletionSuccessfulFromCloudinary = false
     setUploadingOverall(true)
 
-    if (imageToRemove.public_id) {
+    if (imageToRemove.public_id && formData.date) {
       try {
-        await deleteCloudinaryImage(imageToRemove.public_id)
-        setMessage('Image deletion requested from Cloudinary.')
+        await deleteCloudinaryImage(imageToRemove.public_id, formData.date)
+        setMessage('Image deleted from Cloudinary.')
         setMessageType('success')
-        deletionSuccessfulFromCloudinary = true
       } catch (e) {
         console.error(`Error deleting Cloudinary image :`, e)
         setMessage('Failed to delete image from Cloudinary.')
         setMessageType('error')
-        // deletionSuccessfulFromCloudinary remains false
       }
-    } else if (imageToRemove.file) {
-      // If it's a local file (blob URL) that hasn't been uploaded yet
+    } else if (imageToRemove.url) {
       URL.revokeObjectURL(imageToRemove.url)
-      // No Cloudinary deletion needed, consider it "successful" for local state update
-      deletionSuccessfulFromCloudinary = true
-    } else {
-      // If it's just an empty field or a URL that was never uploaded
-      deletionSuccessfulFromCloudinary = true
     }
 
-    // Update local state immediately with the filtered array
-    setFormData((prev) => {
-      return {
-        ...prev,
-        imageUrls: updatedImageUrlsLocally,
-      }
-    })
+    setFormData((prev) => ({ ...prev, imageUrls: updatedImageUrlsLocally }))
 
-    // --- NEW: Immediately save updated imageUrls to Firestore if a Cloudinary image was involved ---
-    // This ensures consistency even if the user closes without hitting "Save Measurement"
-    if (
-      db &&
-      userId &&
-      formData.date &&
-      (imageToRemove.public_id || imageToRemove.file)
-    ) {
+    if (db && userId && formData.date) {
       const dateKey = formData.date
       const docRef = doc(
         db,
@@ -146,21 +146,16 @@ export default function MeasurementModal({
         dateKey
       )
       try {
-        // Prepare the array for Firestore: remove 'file', 'uploading', 'progress' properties
-        const imageUrlsToSave = updatedImageUrlsLocally.map(
-          ({ url, label, public_id }) => ({ url, label, public_id })
-        )
+        const imageUrlsToSave = updatedImageUrlsLocally
+          .filter((img) => img.public_id && img.label)
+          .map(({ label, public_id }) => ({ label, public_id }))
 
-        await setDoc(docRef, { imageUrls: imageUrlsToSave }, { merge: true }) // Merge to only update imageUrls
-        setMessage('Image list updated.') // More generic message
-        setMessageType('success')
+        await setDoc(docRef, { imageUrls: imageUrlsToSave }, { merge: true })
       } catch (e) {
         console.error('Error saving updated imageUrls to Firestore:', e)
-        setMessage('Image removed, but failed to update database record.')
-        setMessageType('error')
       }
     }
-    // --- END NEW ---
+
     setUploadingOverall(false)
   }
 
@@ -200,14 +195,16 @@ export default function MeasurementModal({
     { label: 'Quads (in)', key: 'quads', type: 'number', optional: false },
     { label: 'Calves (in)', key: 'calves', type: 'number', optional: false },
   ]
+
   const handleCleardata = async () => {
     setClearingOverall(true)
     setShowConfirmClearModal(false)
     await onClearData(formData.date)
     setClearingOverall(false)
   }
+
   const handleSaveClick = async () => {
-    const requiredFields = measurementFields.filter((field) => !field.optional)
+    const requiredFields = measurementFields.filter((f) => !f.optional)
     for (const field of requiredFields) {
       if (!formData[field.key] || String(formData[field.key]).trim() === '') {
         setMessage(`Please enter a value for ${field.label}.`)
@@ -215,13 +212,10 @@ export default function MeasurementModal({
         return
       }
     }
-    const imageUrls = formData.imageUrls
-    for (const image of imageUrls) {
-      if (
-        (!image.label || String(image.label).trim() === '') &&
-        (image.url || String(image.url).trim() !== '')
-      ) {
-        setMessage(`Please enter label for image.`)
+
+    for (const image of formData.imageUrls) {
+      if (!image.label || String(image.label).trim() === '') {
+        setMessage(`Please enter a label for all images.`)
         setMessageType('error')
         return
       }
@@ -231,66 +225,39 @@ export default function MeasurementModal({
     setMessage('Saving measurement and uploading images...')
     setMessageType('info')
 
-    const imageOperationPromises = formData.imageUrls.map(async (img, i) => {
-      if (img.file && !img.uploading) {
-        setFormData((prev) => {
-          const newImages = [...prev.imageUrls]
-          newImages[i] = { ...newImages[i], uploading: true, progress: 0 }
-          return { ...prev, imageUrls: newImages }
-        })
-
+    const imageUploadPromises = formData.imageUrls.map(async (img, i) => {
+      if (img.file && !img.public_id) {
         try {
-          setFormData((prev) => {
-            const newImages = [...prev.imageUrls]
-            newImages[i] = { ...newImages[i], progress: 50 }
-            return { ...prev, imageUrls: newImages }
-          })
-
-          const uploadResult = await uploadImageToCloudinary(img.file, userId)
-
-          setFormData((prev) => {
-            const newImages = [...prev.imageUrls]
-            newImages[i] = {
-              ...newImages[i],
-              url: uploadResult.url,
-              public_id: uploadResult.public_id,
-              file: null,
-              uploading: false,
-              progress: 100,
+          const uploadResult = await uploadImageToCloudinary(
+            img.file,
+            (progress) => {
+              setFormData((prev) => {
+                const newImages = [...prev.imageUrls]
+                newImages[i] = { ...newImages[i], uploading: true, progress }
+                return { ...prev, imageUrls: newImages }
+              })
             }
-            return { ...prev, imageUrls: newImages }
-          })
-
+          )
           return {
-            url: uploadResult.url,
             label: img.label,
             public_id: uploadResult.public_id,
           }
         } catch (error) {
           console.error('Cloudinary upload failed:', error)
-          setMessage(
-            `Image upload failed for ${img.file.name}: ${error.message}`
-          )
-          setMessageType('error')
-          setFormData((prev) => {
-            const newImages = [...prev.imageUrls]
-            newImages[i] = { ...newImages[i], uploading: false, progress: 0 }
-            return { ...prev, imageUrls: newImages }
-          })
           return null
         }
-      } else {
-        const { file, uploading, progress, ...rest } = img
-        return rest
+      } else if (img.public_id) {
+        const { public_id, label } = img
+        return { public_id, label }
       }
+      return null
     })
 
     try {
-      const resolvedImages = await Promise.all(imageOperationPromises)
-
-      const finalImageUrlsToSave = resolvedImages.filter(
-        (img) => img && img.url && img.url.trim() !== ''
-      )
+      const resolvedImages = await Promise.all(imageUploadPromises)
+      const finalImageUrlsToSave = resolvedImages
+        .filter((img) => img && img.public_id && img.label)
+        .map(({ label, public_id }) => ({ label, public_id }))
 
       const dataToSave = {
         ...formData,
@@ -299,10 +266,17 @@ export default function MeasurementModal({
 
       onSave(dataToSave)
 
-      setFormData((prev) => ({ ...prev, imageUrls: finalImageUrlsToSave }))
+      const cleanedImageUrls = finalImageUrlsToSave.map((img) => ({
+        ...img,
+        file: null,
+        url: null,
+        uploading: false,
+        progress: 0,
+      }))
+      setFormData((prev) => ({ ...prev, imageUrls: cleanedImageUrls }))
     } catch (error) {
       console.error('Error during save or upload:', error)
-      setMessage('Failed to save measurement or upload some images.')
+      setMessage('An error occurred while saving. Please try again.')
       setMessageType('error')
     } finally {
       setUploadingOverall(false)
@@ -358,96 +332,93 @@ export default function MeasurementModal({
         <h4 className='text-lg font-semibold text-gray-200 mb-2'>
           Physique Pictures (Optional)
         </h4>
-        <div className='space-y-3 mb-4 flex flex-col'>
-          {formData.imageUrls.map((img, index) => (
-            <div
-              key={index}
-              className='flex flex-row gap-2 text-sm sm:text-base pb-1 items-center overflow-auto'
-            >
-              {/* Image Preview / File Input */}
-              {img.url && !img.file ? (
-                <div
-                  className='relative w-20 h-20 sm:w-24 sm:h-24 rounded-md overflow-hidden border border-gray-700 flex-shrink-0'
-                  tabIndex={-1}
-                  aria-label={`Image: ${img.label || `Image ${index + 1}`}`}
-                >
-                  <img
-                    src={img.url}
-                    alt={img.label || `Physique Image ${index + 1}`}
-                    className='w-full h-full object-cover'
-                    onError={(e) => {
-                      e.target.onerror = null
-                      e.target.src =
-                        'https://placehold.co/96x96/4a5568/a0aec0?text=Error'
-                    }}
-                  />
-                  {img.label && (
-                    <span className='absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 truncate'>
-                      {img.label}
-                    </span>
-                  )}
-                </div>
-              ) : img.file ? (
-                <div className='relative w-20 h-20 sm:w-24 sm:h-24 rounded-md overflow-hidden border border-blue-500 flex-shrink-0'>
-                  <img
-                    src={img.url}
-                    alt='Local preview'
-                    className='w-full h-full object-cover'
-                  />
-                  {img.uploading && (
-                    <div className='absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center text-white text-xs'>
-                      Uploading: {Math.round(img.progress)}%
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <label className='w-20 h-20 sm:w-24 sm:h-24 border border-dashed border-gray-600 rounded-md flex items-center justify-center cursor-pointer flex-shrink-0 bg-gray-900 hover:bg-gray-800 transition-colors text-gray-400'>
-                  <input
-                    type='file'
-                    accept='image/*'
-                    onChange={(e) => handleFileChange(index, e)}
-                    className='hidden'
-                    disabled={uploadingOverall}
-                    aria-label={`Upload image ${index + 1}`}
-                  />
-                  <FaPlus />
-                </label>
-              )}
 
-              {!img.file && (
+        {/* Image input rows */}
+        <div className='space-y-3 mb-4 flex flex-col'>
+          {formData.imageUrls.map((img, index) => {
+            const displayUrl =
+              img.public_id && signedUrls[index] ? signedUrls[index] : img.url
+
+            return (
+              <div
+                key={index}
+                className='flex flex-row gap-2 text-sm sm:text-base pb-1 items-center overflow-auto'
+              >
+                {/* Image Preview / File Input */}
+                {img.public_id && signedUrls[index] ? (
+                  <div
+                    className='relative w-20 h-20 sm:w-24 sm:h-24 rounded-md overflow-hidden border border-gray-700 flex-shrink-0'
+                    tabIndex={-1}
+                    aria-label={`Image: ${img.label || `Image ${index + 1}`}`}
+                  >
+                    <img
+                      src={displayUrl}
+                      alt={img.label || `Physique Image ${index + 1}`}
+                      className='w-full h-full object-cover'
+                      onError={(e) => {
+                        e.target.onerror = null
+                        e.target.src =
+                          'https://placehold.co/96x96/4a5568/a0aec0?text=Error'
+                      }}
+                    />
+                    {img.label && (
+                      <span className='absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 truncate'>
+                        {img.label}
+                      </span>
+                    )}
+                  </div>
+                ) : img.file ? (
+                  <div className='relative w-20 h-20 sm:w-24 sm:h-24 rounded-md overflow-hidden border border-blue-500 flex-shrink-0'>
+                    <img
+                      src={img.url}
+                      alt='Local preview'
+                      className='w-full h-full object-cover'
+                    />
+                    {img.uploading && (
+                      <div className='absolute inset-0 bg-black bg-opacity-70 flex items-center justify-center text-white text-xs'>
+                        Uploading: {Math.round(img.progress)}%
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <label className='w-20 h-20 sm:w-24 sm:h-24 border border-dashed border-gray-600 rounded-md flex items-center justify-center cursor-pointer flex-shrink-0 bg-gray-900 hover:bg-gray-800 transition-colors text-gray-400'>
+                    <input
+                      type='file'
+                      accept='image/*'
+                      onChange={(e) => handleFileChange(index, e)}
+                      className='hidden'
+                      disabled={uploadingOverall}
+                      aria-label={`Upload image ${index + 1}`}
+                    />
+                    <FaPlus />
+                  </label>
+                )}
+
+                {/* Image Label Input */}
                 <input
-                  type='url'
-                  placeholder={`Image ${index + 1} URL`}
-                  value={img.url}
+                  type='text'
+                  placeholder='Label (e.g., Front Pose)'
+                  value={img.label || ''}
                   onChange={(e) =>
-                    handleImageURLChange(index, 'url', e.target.value)
+                    handleImageLabelChange(index, e.target.value)
                   }
                   className='flex-grow sm:p-3 p-1.5 bg-gray-800 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
                   disabled={uploadingOverall}
                 />
-              )}
 
-              <input
-                type='text'
-                placeholder='Label (e.g., Front Pose)'
-                value={img.label}
-                onChange={(e) =>
-                  handleImageURLChange(index, 'label', e.target.value)
-                }
-                className='flex-grow sm:p-3 p-1.5 bg-gray-800 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
-                disabled={uploadingOverall}
-              />
+                {/* Remove button */}
+                <button
+                  onClick={() => handleRemoveImageField(index)}
+                  className='sm:p-4 p-[9px] bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors sm:mr-1 shadow-[2px_2px_0px_0px_#030712] border border-gray-950 mr-1 flex-shrink-0'
+                  disabled={uploadingOverall}
+                  aria-label={`Remove image ${index + 1}`}
+                >
+                  <FaMinus />
+                </button>
+              </div>
+            )
+          })}
 
-              <button
-                onClick={() => handleRemoveImageField(index)}
-                className='sm:p-4 p-[9px] bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors sm:mr-1 shadow-[2px_2px_0px_0px_#030712] border border-gray-950 mr-1 flex-shrink-0'
-                disabled={uploadingOverall}
-                aria-label={`Remove image ${index + 1}`}
-              >
-                <FaMinus />
-              </button>
-            </div>
-          ))}
           {formData.imageUrls.length < 15 && (
             <button
               onClick={handleAddImageField}
@@ -469,32 +440,33 @@ export default function MeasurementModal({
           )}
         </div>
 
-        {formData.imageUrls.filter((img) => img.url).length > 0 && (
+        {formData.imageUrls.length > 0 && (
           <div className='mt-4'>
             <h4 className='font-semibold xs:text-base text-sm text-gray-200 mb-2 xs:mb-4'>
               Current Images:
             </h4>
             <div className='flex overflow-x-auto sm:gap-4 gap-2 pb-3'>
-              {formData.imageUrls
-                .filter((img) => img.url)
-                .map((img, idx) => (
+              {formData.imageUrls.map((img, idx) => {
+                const displayUrl =
+                  img.public_id && signedUrls[idx] ? signedUrls[idx] : img.url
+                if (!displayUrl) return null
+
+                return (
                   <div
                     key={idx}
                     role='button'
                     tabIndex={0}
-                    onClick={() => handleImageClick(img.url, img.label)}
+                    onClick={() => handleImageClick(displayUrl, img.label)}
                     onKeyDown={(e) =>
-                      handleImageKeyPress(e, img.url, img.label)
+                      handleImageKeyPress(e, displayUrl, img.label)
                     }
-                    className='w-[120px] sm:w-[140px] md:w-[180px] 
-                        flex-shrink-0  select-none  
-                    relative bg-[#16202f] sm:p-2 p-1 rounded-lg cursor-pointer border border-gray-700 hover:shadow-[0px_0px_0px_0px_#030712] shadow-[5px_5px_0px_0px_#030712] duration-500 overflow-hidden group'
+                    className='w-[120px] sm:w-[140px] md:w-[180px] flex-shrink-0 select-none relative bg-[#16202f] sm:p-2 p-1 rounded-lg cursor-pointer border border-gray-700 hover:shadow-[0px_0px_0px_0px_#030712] shadow-[5px_5px_0px_0px_#030712] duration-500 overflow-hidden group'
                     aria-label={`Preview image: ${
                       img.label || `Physique Image ${idx + 1}`
                     }`}
                   >
                     <img
-                      src={img.url}
+                      src={displayUrl}
                       alt={img.label || `Physique Image ${idx + 1}`}
                       className='w-full h-[100px] xs:h-[120px] sm:h-[140px] md:h-[180px] object-cover rounded-md xs:mb-2 transition-transform duration-300 group-hover:scale-105'
                       onError={(e) => {
@@ -504,12 +476,13 @@ export default function MeasurementModal({
                       }}
                     />
                     {img.label && (
-                      <p className='text-xs text-gray-400  p-0.5  truncate'>
+                      <p className='text-xs text-gray-400 p-0.5 truncate'>
                         {img.label}
                       </p>
                     )}
                   </div>
-                ))}
+                )
+              })}
             </div>
           </div>
         )}
@@ -519,7 +492,7 @@ export default function MeasurementModal({
         {Clearable && (
           <button
             onClick={() => setShowConfirmClearModal(true)}
-            className={`px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-orange-600 text-white rounded-md  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 ${
+            className={`px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-orange-600 text-white rounded-md  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 ${
               uploadingOverall || clearingOverall
                 ? 'bg-orange-900'
                 : 'bg-orange-600 hover:bg-orange-700'
@@ -540,7 +513,7 @@ export default function MeasurementModal({
         )}
         <button
           onClick={handleSaveClick}
-          className={`px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base  text-white rounded-md  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 ${
+          className={`px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base  text-white rounded-md  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 ${
             uploadingOverall || clearingOverall
               ? 'bg-green-900'
               : 'bg-green-600 hover:bg-green-700'

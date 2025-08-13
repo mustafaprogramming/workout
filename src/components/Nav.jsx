@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigation } from '../context/NavigationContext'
 import { ROUTES } from '../route'
 import NavItem from './NavItem'
@@ -10,7 +11,7 @@ const navLinks = [
   { route: ROUTES.settings, label: 'Settings', icon: '⚙️' },
 ]
 
-export default function Nav() {
+export default function Nav({workoutPageActive}) {
   const { currentPage, setCurrentPage } = useNavigation()
 
   return (
@@ -19,16 +20,21 @@ export default function Nav() {
       aria-label='Main Navigation'
       className='bg-gray-800 sticky z-[50] top-[86px] text-white sm:p-3 p-1 rounded-xl mx-6 my-4 grid grid-cols-5 sm:gap-2 gap-1 justify-around items-center sm:shadow-[0_10px_0px_0px_#030712] shadow-[0_5px_0px_0px_#030712] border border-gray-950 text-xs md:text-base sm:text-sm'
     >
-      {navLinks.map(({ route, label, icon }) => (
-        <NavItem
-          key={route}
-          onClick={() => setCurrentPage(route)}
-          isActive={currentPage === route}
-          aria-current={currentPage === route ? 'page' : undefined}
-        >
-          {icon} <span className='xs:flex hidden'>{label}</span>
-        </NavItem>
-      ))}
+      {navLinks.map(({ route, label, icon }) => {
+        if (route === ROUTES.calendar && workoutPageActive) {
+          route = ROUTES.workoutLog
+        }
+        return (
+          <NavItem
+            key={route}
+            onClick={() => setCurrentPage(route)}
+            isActive={currentPage === route}
+            aria-current={currentPage === route ? 'page' : undefined}
+          >
+            {icon} <span className='xs:flex hidden'>{label}</span>
+          </NavItem>
+        )
+      })}
     </nav>
   )
 }

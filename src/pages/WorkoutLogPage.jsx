@@ -16,7 +16,7 @@ import {
   FaTrash,
 } from 'react-icons/fa'
 
-export default function WorkoutLogPage({ selectedDate }) {
+export default function WorkoutLogPage({ selectedDate, setWorkoutPageActive }) {
   const { setCurrentPage } = useNavigation()
   const { db, userId, isAuthReady } = useFirebase()
   const [exercises, setExercises] = useState([])
@@ -520,7 +520,10 @@ export default function WorkoutLogPage({ selectedDate }) {
       </section>
 
       <button
-        onClick={() => setCurrentPage(ROUTES.calendar)}
+        onClick={() => {
+          setWorkoutPageActive(false)
+          setCurrentPage(ROUTES.calendar)
+        }}
         className='px-6 py-3 bg-gray-900 text-gray-100 rounded-lg hover:bg-gray-700  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 flex gap-2 items-center justify-center mx-auto mb-6'
         aria-label='Back to calendar page'
       >

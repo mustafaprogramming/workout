@@ -1,7 +1,7 @@
 import { FirebaseProvider, useFirebase } from './context/FirebaseContext'
 import { TimerProvider, useTimer } from './context/TimerContext'
 import { NavigationProvider } from './context/NavigationContext'
-
+import { ImageProvider } from './context/ImageContext'
 //components
 import FloatingTimer from './components/FloatingTimer'
 import AlarmModal from './components/AlarmModal'
@@ -13,13 +13,13 @@ import { MessageContextProvider, useMessage } from './context/MessageContext'
 import { useEffect, useState } from 'react'
 import { FaTimes } from 'react-icons/fa'
 
-
-
 // Main App Component
 const AppContent = () => {
   const { userId, isAuthReady, messagePopUpTime } = useFirebase()
   const { message, messageType, setMessage, setMessageType } = useMessage()
   const [closingMessage, setClosingMessage] = useState(true)
+  const [workoutPageActive, setWorkoutPageActive] = useState(false)
+  
   useEffect(() => {
     if (closingMessage) {
       const messageClose = setTimeout(() => {
@@ -41,7 +41,7 @@ const AppContent = () => {
     const messageClose = setTimeout(() => {
       setMessage('')
     }, messagePopUpTime)
-    
+
     return () => {
       clearTimeout(messageClose)
     }
@@ -61,7 +61,7 @@ const AppContent = () => {
     showAlarm,
     setShowAlarm,
   } = useTimer()
-  
+
   if (!isAuthReady) {
     return (
       <div className='min-h-screen flex items-center justify-center bg-gray-900 text-gray-100 p-4'>
@@ -77,12 +77,12 @@ const AppContent = () => {
       </div>
     )
   }
-  
+
   return (
     <div className='min-h-screen bg-gray-900 text-gray-100 font-inter'>
       <AppOfflineBanner />
       <Header />
-      {userId && <Nav />}
+      {userId && <Nav workoutPageActive={workoutPageActive} />}
       <div
         role='status'
         aria-live='polite'
@@ -107,7 +107,7 @@ const AppContent = () => {
           <FaTimes />
         </button>
       </div>
-      <main className='p-2 sm:p-4'>{<RenderPage />}</main>
+      <main className='p-2 sm:p-4'>{<RenderPage setWorkoutPageActive={setWorkoutPageActive}/>}</main>
       {showMiniStopwatch && (
         <FloatingTimer
           type='stopwatch'
@@ -134,13 +134,15 @@ const AppContent = () => {
 export default function App() {
   return (
     <FirebaseProvider>
-      <MessageContextProvider>
-        <TimerProvider>
-          <NavigationProvider>
-            <AppContent />
-          </NavigationProvider>
-        </TimerProvider>
-      </MessageContextProvider>
+      <ImageProvider>
+        <MessageContextProvider>
+          <TimerProvider>
+            <NavigationProvider>
+              <AppContent />
+            </NavigationProvider>
+          </TimerProvider>
+        </MessageContextProvider>
+      </ImageProvider>
     </FirebaseProvider>
   )
 }
