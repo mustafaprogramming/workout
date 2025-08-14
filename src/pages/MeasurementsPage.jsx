@@ -107,6 +107,7 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
             imageUrls: (measurements[dateKey].imageUrls || []).map((img) => ({
               label: img.label || '',
               public_id: img.public_id || null,
+              format: img.format || null, // <-- NEW
             })),
           }
         : {
@@ -312,7 +313,7 @@ export default function MeasurementsPage({ selectedMonth, setSelectedMonth }) {
             const dateKey = formatDate(new Date(data.date))
             // This is the corrected line to only save label and public_id
             const sanitizedImageUrls = (data.imageUrls || []).map(
-              ({ label, public_id }) => ({ label, public_id })
+              ({ label, public_id, format }) => ({ label, public_id, format })
             )
 
             const sanitizedData = {

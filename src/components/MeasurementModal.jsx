@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import ImagePreviewModal from './ImagePreviewModal'
 import Modal from './Modal'
 import { useFirebase } from '../context/FirebaseContext'
+import { useImageContext } from '../context/ImageContext'
 import {
   uploadImageToCloudinary,
   deleteCloudinaryImage,
@@ -10,7 +11,7 @@ import { doc, setDoc } from 'firebase/firestore'
 import { useMessage } from '../context/MessageContext'
 import { FaBroom, FaMinus, FaPlus, FaSave } from 'react-icons/fa'
 import { useSignedImages } from '../hooks/useSignedImages'
-import { GalleryView } from './GalleryView'
+import { formatDate } from '../util/utils'
 
 export default function MeasurementModal({
   monthData,
@@ -20,21 +21,23 @@ export default function MeasurementModal({
   Clearable,
 }) {
   const { db, userId } = useFirebase()
+  const { removeCachedImage } = useImageContext()
+
   const appId =
     import.meta.env.VITE_FIREBASE_APP_ID || 'workout-tracker-app-local'
 
   const [formData, setFormData] = useState(() => {
     const initialData = monthData || {}
-    // Ensure imageUrls is an array of objects with public_id and label
-    const initialImageUrls = initialData.imageUrls
-      ? initialData.imageUrls.map((img) => ({
-          ...img,
-          file: null,
-          url: null,
-          uploading: false,
-          progress: 0,
-        }))
-      : []
+    // Preserve existing format for saved images, reset for new ones
+    const initialImageUrls = (initialData.imageUrls || []).map((img) => ({
+      ...img,
+      file: null,
+      format: img.format ?? null, // ✅ keep existing format if present
+      url: null,
+      uploading: false,
+      progress: 0,
+    }))
+
     return {
       ...initialData,
       imageUrls: initialImageUrls,
@@ -42,13 +45,20 @@ export default function MeasurementModal({
     }
   })
 
+  // keep your existing publicIds + signedUrls:
   const publicIds = useMemo(
-    () => formData.imageUrls.map((img) => img.public_id).filter(Boolean),
+    () => formData.imageUrls.map((i) => i.public_id).filter(Boolean),
     [formData.imageUrls]
   )
   const signedUrls = formData?.date
     ? useSignedImages(publicIds, formData.date)
     : []
+  // NEW: build an id→url map so gaps don’t break alignment
+  const pidToUrl = useMemo(() => {
+    const m = new Map()
+    publicIds.forEach((pid, i) => m.set(pid, signedUrls?.[i] ?? null))
+    return m
+  }, [publicIds, signedUrls])
   const [showImagePreview, setShowImagePreview] = useState(false)
   const [previewImageUrl, setPreviewImageUrl] = useState('')
   const [previewImageLabel, setPreviewImageLabel] = useState('')
@@ -115,49 +125,61 @@ export default function MeasurementModal({
   }
 
   const handleRemoveImageField = async (indexToRemove) => {
-    const imageToRemove = formData.imageUrls[indexToRemove]
-    const updatedImageUrlsLocally = formData.imageUrls.filter(
-      (_, i) => i !== indexToRemove
+  const imageToRemove = formData.imageUrls[indexToRemove]
+  const updatedImageUrlsLocally = formData.imageUrls.filter(
+    (_, i) => i !== indexToRemove
+  )
+
+  // 1. Update local state immediately
+  setFormData((prev) => ({
+    ...prev,
+    imageUrls: updatedImageUrlsLocally,
+  }))
+
+  // 2. Remove from cache immediately
+  if (imageToRemove.public_id && formData.date) {
+    removeCachedImage(imageToRemove.public_id, formData.date)
+  }
+
+  setUploadingOverall(true)
+
+  // 3. Await Cloudinary deletion
+  if (imageToRemove.public_id && formData.date) {
+    try {
+      await deleteCloudinaryImage(imageToRemove.public_id, formData.date)
+      setMessage('Image deleted from Cloudinary.')
+      setMessageType('success')
+    } catch (e) {
+      console.error('Error deleting Cloudinary image:', e)
+      setMessage('Failed to delete image from Cloudinary.')
+      setMessageType('error')
+    }
+  } else if (imageToRemove.url) {
+    URL.revokeObjectURL(imageToRemove.url)
+  }
+
+  // 4. Await Firestore save
+  if (db && userId && formData.date) {
+    const dateKey = formatDate(new Date(formData.date))
+    const docRef = doc(
+      db,
+      `artifacts/${appId}/users/${userId}/measurements`,
+      dateKey
     )
 
-    setUploadingOverall(true)
+    const imageUrlsToSave = updatedImageUrlsLocally
+      .filter((img) => img.public_id && img.label)
+      .map(({ label, public_id, format }) => ({ label, public_id, format }))
 
-    if (imageToRemove.public_id && formData.date) {
-      try {
-        await deleteCloudinaryImage(imageToRemove.public_id, formData.date)
-        setMessage('Image deleted from Cloudinary.')
-        setMessageType('success')
-      } catch (e) {
-        console.error(`Error deleting Cloudinary image :`, e)
-        setMessage('Failed to delete image from Cloudinary.')
-        setMessageType('error')
-      }
-    } else if (imageToRemove.url) {
-      URL.revokeObjectURL(imageToRemove.url)
+    try {
+      await setDoc(docRef, { imageUrls: imageUrlsToSave }, { merge: true })
+    } catch (e) {
+      console.error('Error saving updated imageUrls to Firestore:', e)
     }
-
-    setFormData((prev) => ({ ...prev, imageUrls: updatedImageUrlsLocally }))
-
-    if (db && userId && formData.date) {
-      const dateKey = formData.date
-      const docRef = doc(
-        db,
-        `artifacts/${appId}/users/${userId}/measurements`,
-        dateKey
-      )
-      try {
-        const imageUrlsToSave = updatedImageUrlsLocally
-          .filter((img) => img.public_id && img.label)
-          .map(({ label, public_id }) => ({ label, public_id }))
-
-        await setDoc(docRef, { imageUrls: imageUrlsToSave }, { merge: true })
-      } catch (e) {
-        console.error('Error saving updated imageUrls to Firestore:', e)
-      }
-    }
-
-    setUploadingOverall(false)
   }
+
+  setUploadingOverall(false)
+}
 
   const handleImageClick = (url, label) => {
     setPreviewImageUrl(url)
@@ -241,14 +263,15 @@ export default function MeasurementModal({
           return {
             label: img.label,
             public_id: uploadResult.public_id,
+            format: uploadResult.format, // <-- NEW
           }
         } catch (error) {
           console.error('Cloudinary upload failed:', error)
           return null
         }
       } else if (img.public_id) {
-        const { public_id, label } = img
-        return { public_id, label }
+        const { public_id, label, format } = img
+        return { public_id, label, format }
       }
       return null
     })
@@ -257,7 +280,7 @@ export default function MeasurementModal({
       const resolvedImages = await Promise.all(imageUploadPromises)
       const finalImageUrlsToSave = resolvedImages
         .filter((img) => img && img.public_id && img.label)
-        .map(({ label, public_id }) => ({ label, public_id }))
+        .map(({ label, public_id, format }) => ({ label, public_id, format }))
 
       const dataToSave = {
         ...formData,
@@ -269,7 +292,6 @@ export default function MeasurementModal({
       const cleanedImageUrls = finalImageUrlsToSave.map((img) => ({
         ...img,
         file: null,
-        url: null,
         uploading: false,
         progress: 0,
       }))
@@ -336,8 +358,9 @@ export default function MeasurementModal({
         {/* Image input rows */}
         <div className='space-y-3 mb-4 flex flex-col'>
           {formData.imageUrls.map((img, index) => {
-            const displayUrl =
-              img.public_id && signedUrls[index] ? signedUrls[index] : img.url
+            const displayUrl = img.public_id
+              ? pidToUrl.get(img.public_id) ?? img.url
+              : img.url
 
             return (
               <div
@@ -345,7 +368,7 @@ export default function MeasurementModal({
                 className='flex flex-row gap-2 text-sm sm:text-base pb-1 items-center overflow-auto'
               >
                 {/* Image Preview / File Input */}
-                {img.public_id && signedUrls[index] ? (
+                {img.public_id && pidToUrl.get(img.public_id) ? (
                   <div
                     className='relative w-20 h-20 sm:w-24 sm:h-24 rounded-md overflow-hidden border border-gray-700 flex-shrink-0'
                     tabIndex={-1}
@@ -409,7 +432,11 @@ export default function MeasurementModal({
                 {/* Remove button */}
                 <button
                   onClick={() => handleRemoveImageField(index)}
-                  className='sm:p-4 p-[9px] bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors sm:mr-1 shadow-[2px_2px_0px_0px_#030712] border border-gray-950 mr-1 flex-shrink-0'
+                  className={`'sm:p-4 p-[9px]  text-white rounded-md  transition-colors sm:mr-1 shadow-[2px_2px_0px_0px_#030712] border border-gray-950 mr-1 flex-shrink-0 ${
+                    uploadingOverall
+                      ? 'bg-red-900'
+                      : 'hover:bg-red-700 bg-red-600'
+                  }`}
                   disabled={uploadingOverall}
                   aria-label={`Remove image ${index + 1}`}
                 >
@@ -447,8 +474,9 @@ export default function MeasurementModal({
             </h4>
             <div className='flex overflow-x-auto sm:gap-4 gap-2 pb-3'>
               {formData.imageUrls.map((img, idx) => {
-                const displayUrl =
-                  img.public_id && signedUrls[idx] ? signedUrls[idx] : img.url
+                const displayUrl = img.public_id
+                  ? pidToUrl.get(img.public_id) ?? img.url
+                  : img.url
                 if (!displayUrl) return null
 
                 return (

@@ -1,4 +1,3 @@
-// /api/getSignedImageUrl.js
 import { auth, db } from './lib/initFirebaseAdmin.js'
 import { v2 as cloudinary } from 'cloudinary'
 
@@ -38,7 +37,8 @@ export default async function handler(req, res) {
       return res.status(401).json({ message: 'Invalid or expired token.' })
     }
     const userId = decoded.uid
-
+    console.log('User:', userId)
+    console.log('Requested docId:', docId, 'publicId:', publicId)
     // App ID
     const appId =
       process.env.FIREBASE_APP_ID ||
@@ -48,6 +48,7 @@ export default async function handler(req, res) {
     const decodedPublicId = decodeURIComponent(publicId)
 
     let imageFound = false
+    let fileFormat = null
 
     // Check measurements
     const measurementsRef = db
@@ -61,15 +62,18 @@ export default async function handler(req, res) {
     const measurementsSnap = await measurementsRef.get()
     if (measurementsSnap.exists) {
       const data = measurementsSnap.data() || {}
-      if (
-        Array.isArray(data.imageUrls) &&
-        data.imageUrls.some((img) => img?.public_id === decodedPublicId)
-      ) {
-        imageFound = true
+      if (Array.isArray(data.imageUrls)) {
+        const match = data.imageUrls.find(
+          (img) => img?.public_id === decodedPublicId
+        )
+        if (match) {
+          imageFound = true
+          fileFormat = match.format || match.fileFormat || null
+        }
       }
     }
 
-    // Check gallery if not found in measurements
+    // Check gallery if not found
     if (!imageFound) {
       const galleryRef = db
         .collection('artifacts')
@@ -84,28 +88,30 @@ export default async function handler(req, res) {
         const g = gallerySnap.data() || {}
         if (g.public_id === decodedPublicId) {
           imageFound = true
+          fileFormat = g.format || g.fileFormat || null
         }
       }
     }
-
+    
     if (!imageFound) {
       console.warn(
-        `[getSignedImageUrl] Ownership check failed appId=${appId}, userId=${userId}, docId=${docId}, publicId=${decodedPublicId}`
+        `[getSignedImageUrl] Ownership check failed for publicId=${decodedPublicId}`
       )
-      return res.status(403).json({
-        message: 'Forbidden: You do not have permission to view this image.',
-      })
+      return res
+        .status(403)
+        .json({ message: 'Forbidden: No permission for this image.' })
     }
 
-    // --- Get actual format from Cloudinary ---
-    const resource = await cloudinary.api.resource(decodedPublicId, {
-      type: 'authenticated',
-    })
-    const fileFormat = resource.format // jpg, png, webp, etc.
+    if (!fileFormat) {
+      console.error(
+        `[getSignedImageUrl] Missing fileFormat for ${decodedPublicId}`
+      )
+      return res
+        .status(500)
+        .json({ message: 'Image format not found in metadata.' })
+    }
 
-    const expiresAt = Math.floor(Date.now() / 1000) + 3600
-
-    // Real expiring URL
+    const expiresAt = Math.floor(Date.now() / 1000) + 60 // 1 hour expiry
     const signedUrl = cloudinary.utils.private_download_url(
       decodedPublicId,
       fileFormat,

@@ -271,6 +271,7 @@ export default function GalleryPage() {
       const newGalleryImage = {
         label: newImageLabel.trim(),
         public_id: uploadResult.public_id,
+        format: uploadResult.format, // <-- NEW
         uploadedAt: new Date(),
       }
       await addDoc(
