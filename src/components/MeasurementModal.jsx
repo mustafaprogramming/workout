@@ -69,6 +69,7 @@ export default function MeasurementModal({
   const [deleteName, setDeleteName] = useState('')
   const [uploadingOverall, setUploadingOverall] = useState(false)
   const [clearingOverall, setClearingOverall] = useState(false)
+  const [tipModal, setTipModal] = useState(false)
 
   // ---------- handlers ----------
   const handleFieldChange = (e) => {
@@ -312,14 +313,129 @@ export default function MeasurementModal({
 
   return (
     <Modal onClose={onClose} disableClose={uploadingOverall || clearingOverall}>
-      <h3 className='text-lg sm:text-xl font-bold text-blue-400 mb-4 mr-[34px]'>
+      <h3 className='text-lg sm:text-xl font-bold text-blue-400 mb-2 mr-[34px]'>
         Measurements for{' '}
         {new Date(formData.date).toLocaleString('default', {
           month: 'long',
           year: 'numeric',
         })}
       </h3>
+      <button
+        className='mb-2 rounded-md px-2 py-0.5 ml-auto flex transition shadow-[3px_3px_0px_0px_#030712] hover:shadow-[0px_0px_0px_0px_#030712] border border-gray-950 text-xs xs:text-sm bg-blue-600 hover:bg-blue-700 text-white '
+        onClick={() => {
+          setTipModal(true)
+        }}
+      >
+        View Measurement Tips
+      </button>
 
+      {tipModal && (
+        <Modal onClose={() => setTipModal(false)}>
+          <div className='px-2 max-h-[60vh] overflow-auto'>
+            <div className='font-semibold mt-2 text-gray-200  text-sm xs:text-base sm:text-lg'>
+              General Tips:
+            </div>
+            <ul className='list-disc pl-6 text-xs xs:text-sm text-gray-300 my-1 mb-3'>
+              <li>
+                Measure at the same time of day (morning is best, before eating)
+              </li>
+              <li>Wear minimal, tight-fitting clothes or measure bare skin</li>
+              <li>
+                Take measurements on the same side of your body every time
+                (usually right side)
+              </li>
+              <li>
+                Keep the tape snug but not tight, it shouldn’t squeeze your skin
+              </li>
+              <li>
+                Stand relaxed and avoid flexing muscles during measurement
+                (unless tracking flexed size)
+              </li>
+            </ul>
+            <div className='font-semibold text-gray-200  text-xs xs:text-base sm:text-lg'>
+              How to Measure Key Body Parts :
+            </div>
+            <div className='overflow-auto max-h-[50vh] my-3  min-w-full'>
+              <table className=' text-gray-200 text-xs xs:text-sm border-separate border-spacing-x-2 border-spacing-y-1 min-w-max'>
+                <thead>
+                  <tr className='text-nowrap'>
+                    <th className=' py-1 text-left '>Body Part</th>
+                    <th className=' py-1 text-left '>Measurement Location</th>
+                    <th className=' py-1 text-left '>Instructions</th>
+                  </tr>
+                </thead>
+                <tbody className='text-gray-300'>
+                  <tr>
+                    <td className='font-medium text-gray-200  py-1'>Chest</td>
+                    <td className=' py-1'>
+                      Around the fullest part of your chest, under armpits and
+                      across shoulder blades
+                    </td>
+                    <td className=' py-1'>
+                      Tape straight around chest, normal breathing
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className='font-medium text-gray-200  py-1'>Waist</td>
+                    <td className=' py-1'>
+                      Narrowest part of your torso, usually above belly button
+                    </td>
+                    <td className=' py-1'>Stand normally, don't suck in</td>
+                  </tr>
+                  <tr>
+                    <td className='font-medium text-gray-200  py-1'>Biceps</td>
+                    <td className=' py-1'>
+                      Midpoint between shoulder and elbow on relaxed arm
+                    </td>
+                    <td className=' py-1'>Arm relaxed, hanging down</td>
+                  </tr>
+                  <tr>
+                    <td className='font-medium text-gray-200  py-1'>
+                      Forearms
+                    </td>
+                    <td className=' py-1'>
+                      Around the largest part of your forearm
+                    </td>
+                    <td className=' py-1'>Arm relaxed</td>
+                  </tr>
+                  <tr>
+                    <td className='font-medium text-gray-200  py-1'>
+                      Shoulders
+                    </td>
+                    <td className=' py-1'>
+                      Around the largest part of your shoulders
+                    </td>
+                    <td className=' py-1'>Stand naturally, arm relaxed</td>
+                  </tr>
+                  <tr>
+                    <td className='font-medium text-gray-200  py-1'>Hips</td>
+                    <td className=' py-1'>
+                      Around the widest part of your hips or buttocks
+                    </td>
+                    <td className=' py-1'>Feet together, tape level</td>
+                  </tr>
+                  <tr>
+                    <td className='font-medium text-gray-200  py-1'>Thighs</td>
+                    <td className=' py-1'>
+                      Around the largest part of your upper thigh
+                    </td>
+                    <td className=' py-1'>
+                      Stand straight, legs slightly apart
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className='font-medium text-gray-200  py-1'>Calves</td>
+                    <td className=' py-1'>Largest part of your calf</td>
+                    <td className=' py-1'>
+                      Standing, weight evenly distributed
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </Modal>
+      )}
       <div className='overflow-y-scroll overflow-x-hidden max-h-[60vh] pr-2'>
         <div className='grid grid-cols-1 md:grid-cols-2 sm:gap-4 gap-2 mb-4 text-sm sm:text-base'>
           {measurementFields.map((field) => (
