@@ -8,7 +8,7 @@ import {
 } from 'firebase/auth'
 import Modal from '../components/Modal' // Assuming you have a Modal component
 import { FaKey, FaLockOpen, FaSignOutAlt } from 'react-icons/fa'
-import { FcLock } from "react-icons/fc";
+import { FcLock } from 'react-icons/fc'
 
 export default function LockPage({ onUnlock }) {
   const randomSuffix = Math.random().toString(36).substring(2, 8)
@@ -98,15 +98,15 @@ export default function LockPage({ onUnlock }) {
           </p>
         )}
 
-        <input
-          type='password'
+        <textarea
           placeholder='Your Password'
           name={`password_${randomSuffix}`}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className='p-3 w-full bg-gray-950 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 mb-4 '
+          className='p-3 w-full h-[50px] resize-none text-nowrap small-scrollbar overflow-y-hidden break-keep bg-gray-950 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 mb-4'
           aria-label='Enter your password'
-          autoComplete="new-password-1"
+          autoComplete='off'
+          rows={1}
         />
 
         {error && (
@@ -120,8 +120,8 @@ export default function LockPage({ onUnlock }) {
           className='w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950 mb-3 flex gap-2 items-center justify-center'
           aria-label='Unlock app'
         >
-          
-          Unlock<FaLockOpen />
+          Unlock
+          <FaLockOpen />
         </button>
 
         <button

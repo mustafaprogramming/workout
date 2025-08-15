@@ -17,28 +17,29 @@ export function ImageProvider({ children }) {
       [key]: { deleted: true },
     }))
   }, [])
-  
+
   const fetchSignedImage = useCallback(
-    async (publicId, docId) => {
+    async (publicId, docId, { forceRefresh = false } = {}) => {
       if (!publicId || !docId)
         throw new Error('publicId and docId are required')
-      
+
       const key = `${publicId}|${docId}`
       const now = Math.floor(Date.now() / 1000)
 
-      // ✅ Use the latest cache state
       let currentCache
       setImageCache((prev) => {
         currentCache = prev
         return prev
       })
-      
-      
-      // Skip if marked deleted
+
       if (currentCache[key]?.deleted) return null
 
-      // Use cached if valid
-      if (currentCache[key]?.url && currentCache[key].expiresAt > now) {
+      // ⬅ Skip this check if forceRefresh is true
+      if (
+        !forceRefresh &&
+        currentCache[key]?.url &&
+        currentCache[key].expiresAt > now
+      ) {
         return currentCache[key].url
       }
 
@@ -68,15 +69,14 @@ export function ImageProvider({ children }) {
         }
 
         const data = await res.json()
+        const dateThen = data.dateThen
         const signedUrl = data.url || null
         const expiresAt = data.expiresAt
-          ? Math.floor(data.expiresAt - (data.expiresAt - now) * 0.1)
-          : now + 60
 
         if (signedUrl) {
           setImageCache((prev) => ({
             ...prev,
-            [key]: { url: signedUrl, expiresAt },
+            [key]: { url: signedUrl, expiresAt, dateThen },
           }))
         }
 

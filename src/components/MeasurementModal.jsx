@@ -9,7 +9,7 @@ import {
 } from '../util/cloudinaryUtils'
 import { doc, setDoc } from 'firebase/firestore'
 import { useMessage } from '../context/MessageContext'
-import { FaBroom, FaMinus, FaPlus, FaSave } from 'react-icons/fa'
+import { FaBroom, FaMinus, FaPlus, FaSave, FaTrash } from 'react-icons/fa'
 import { useSignedImages } from '../hooks/useSignedImages'
 import { formatDate } from '../util/utils'
 
@@ -64,6 +64,9 @@ export default function MeasurementModal({
   const [previewImageLabel, setPreviewImageLabel] = useState('')
   const { setMessage, setMessageType } = useMessage()
   const [showConfirmClearModal, setShowConfirmClearModal] = useState(false)
+  const [showConfirmDeleteImage, setShowConfirmDeleteImage] = useState(false)
+  const [deleteIndex, setDeleteIndex] = useState(null)
+  const [deleteName, setDeleteName] = useState('')
   const [uploadingOverall, setUploadingOverall] = useState(false)
   const [clearingOverall, setClearingOverall] = useState(false)
 
@@ -125,61 +128,62 @@ export default function MeasurementModal({
   }
 
   const handleRemoveImageField = async (indexToRemove) => {
-  const imageToRemove = formData.imageUrls[indexToRemove]
-  const updatedImageUrlsLocally = formData.imageUrls.filter(
-    (_, i) => i !== indexToRemove
-  )
-
-  // 1. Update local state immediately
-  setFormData((prev) => ({
-    ...prev,
-    imageUrls: updatedImageUrlsLocally,
-  }))
-
-  // 2. Remove from cache immediately
-  if (imageToRemove.public_id && formData.date) {
-    removeCachedImage(imageToRemove.public_id, formData.date)
-  }
-
-  setUploadingOverall(true)
-
-  // 3. Await Cloudinary deletion
-  if (imageToRemove.public_id && formData.date) {
-    try {
-      await deleteCloudinaryImage(imageToRemove.public_id, formData.date)
-      setMessage('Image deleted from Cloudinary.')
-      setMessageType('success')
-    } catch (e) {
-      console.error('Error deleting Cloudinary image:', e)
-      setMessage('Failed to delete image from Cloudinary.')
-      setMessageType('error')
-    }
-  } else if (imageToRemove.url) {
-    URL.revokeObjectURL(imageToRemove.url)
-  }
-
-  // 4. Await Firestore save
-  if (db && userId && formData.date) {
-    const dateKey = formatDate(new Date(formData.date))
-    const docRef = doc(
-      db,
-      `artifacts/${appId}/users/${userId}/measurements`,
-      dateKey
+    const imageToRemove = formData.imageUrls[indexToRemove]
+    const updatedImageUrlsLocally = formData.imageUrls.filter(
+      (_, i) => i !== indexToRemove
     )
+    // 1. Update local state immediately
+    setFormData((prev) => ({
+      ...prev,
+      imageUrls: updatedImageUrlsLocally,
+    }))
 
-    const imageUrlsToSave = updatedImageUrlsLocally
-      .filter((img) => img.public_id && img.label)
-      .map(({ label, public_id, format }) => ({ label, public_id, format }))
-
-    try {
-      await setDoc(docRef, { imageUrls: imageUrlsToSave }, { merge: true })
-    } catch (e) {
-      console.error('Error saving updated imageUrls to Firestore:', e)
+    // 2. Remove from cache immediately
+    if (imageToRemove.public_id && formData.date) {
+      removeCachedImage(imageToRemove.public_id, formData.date)
     }
-  }
 
-  setUploadingOverall(false)
-}
+    setUploadingOverall(true)
+
+    // 3. Await Cloudinary deletion
+    if (imageToRemove.public_id && formData.date) {
+      try {
+        await deleteCloudinaryImage(imageToRemove.public_id, formData.date)
+        setMessage('Image deleted from Cloudinary.')
+        setMessageType('success')
+      } catch (e) {
+        console.error('Error deleting Cloudinary image:', e)
+        setMessage('Failed to delete image from Cloudinary.')
+        setMessageType('error')
+      }
+    } else if (imageToRemove.url) {
+      URL.revokeObjectURL(imageToRemove.url)
+    }
+
+    // 4. Await Firestore save
+    if (db && userId && formData.date) {
+      const dateKey = formatDate(new Date(formData.date))
+      const docRef = doc(
+        db,
+        `artifacts/${appId}/users/${userId}/measurements`,
+        dateKey
+      )
+
+      const imageUrlsToSave = updatedImageUrlsLocally
+        .filter((img) => img.public_id && img.label)
+        .map(({ label, public_id, format }) => ({ label, public_id, format }))
+
+      try {
+        await setDoc(docRef, { imageUrls: imageUrlsToSave }, { merge: true })
+      } catch (e) {
+        console.error('Error saving updated imageUrls to Firestore:', e)
+      }
+    }
+    setShowConfirmDeleteImage(false)
+    setUploadingOverall(false)
+    setDeleteIndex(null)
+    setDeleteName('')
+  }
 
   const handleImageClick = (url, label) => {
     setPreviewImageUrl(url)
@@ -190,6 +194,7 @@ export default function MeasurementModal({
   const handleImageKeyPress = (e, url, label) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
+
       handleImageClick(url, label)
     }
   }
@@ -306,7 +311,7 @@ export default function MeasurementModal({
   }
 
   return (
-    <Modal onClose={onClose} disableClose={uploadingOverall}>
+    <Modal onClose={onClose} disableClose={uploadingOverall || clearingOverall}>
       <h3 className='text-lg sm:text-xl font-bold text-blue-400 mb-4 mr-[34px]'>
         Measurements for{' '}
         {new Date(formData.date).toLocaleString('default', {
@@ -331,7 +336,7 @@ export default function MeasurementModal({
                 placeholder={field.label}
                 required={!field.optional}
                 className='sm:p-3 p-1.5 mt-1 w-full bg-gray-800 shadow-[4px_4px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 text-sm sm:text-base'
-                disabled={uploadingOverall}
+                disabled={uploadingOverall || clearingOverall}
               />
             </label>
           ))}
@@ -346,7 +351,7 @@ export default function MeasurementModal({
               rows='3'
               placeholder="Any additional notes for this month's measurements..."
               className='sm:p-3 p-1.5 mt-1 w-full bg-gray-800 shadow-[4px_4px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100 text-sm sm:text-base'
-              disabled={uploadingOverall}
+              disabled={uploadingOverall || clearingOverall}
             />
           </label>
         </div>
@@ -410,7 +415,7 @@ export default function MeasurementModal({
                       accept='image/*'
                       onChange={(e) => handleFileChange(index, e)}
                       className='hidden'
-                      disabled={uploadingOverall}
+                      disabled={uploadingOverall || clearingOverall}
                       aria-label={`Upload image ${index + 1}`}
                     />
                     <FaPlus />
@@ -426,18 +431,22 @@ export default function MeasurementModal({
                     handleImageLabelChange(index, e.target.value)
                   }
                   className='flex-grow sm:p-3 p-1.5 bg-gray-800 shadow-[3px_3px_0px_0px_#030712] border border-gray-950 rounded-md focus:ring-2 focus:ring-blue-500 text-gray-100'
-                  disabled={uploadingOverall}
+                  disabled={uploadingOverall || clearingOverall}
                 />
 
                 {/* Remove button */}
                 <button
-                  onClick={() => handleRemoveImageField(index)}
-                  className={`'sm:p-4 p-[9px]  text-white rounded-md  transition-colors sm:mr-1 shadow-[2px_2px_0px_0px_#030712] border border-gray-950 mr-1 flex-shrink-0 ${
-                    uploadingOverall
+                  onClick={() => {
+                    setShowConfirmDeleteImage(true)
+                    setDeleteIndex(index)
+                    setDeleteName(formData.imageUrls[index].label)
+                  }}
+                  className={` sm:p-4 p-[9px]  text-white rounded-md  transition-colors sm:mr-1 shadow-[2px_2px_0px_0px_#030712] border border-gray-950 mr-1 flex-shrink-0 ${
+                    uploadingOverall || clearingOverall
                       ? 'bg-red-900'
                       : 'hover:bg-red-700 bg-red-600'
                   }`}
-                  disabled={uploadingOverall}
+                  disabled={uploadingOverall || clearingOverall}
                   aria-label={`Remove image ${index + 1}`}
                 >
                   <FaMinus />
@@ -449,8 +458,12 @@ export default function MeasurementModal({
           {formData.imageUrls.length < 15 && (
             <button
               onClick={handleAddImageField}
-              className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full '
-              disabled={uploadingOverall}
+              className={`px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base  text-white rounded-md  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 w-full ${
+                uploadingOverall || clearingOverall
+                  ? 'bg-purple-900'
+                  : 'hover:bg-purple-700 bg-purple-600'
+              }`}
+              disabled={uploadingOverall || clearingOverall}
             >
               {formData.imageUrls.length > 0 ? (
                 <span className='flex gap-2 items-center justify-center'>
@@ -480,15 +493,20 @@ export default function MeasurementModal({
                 if (!displayUrl) return null
 
                 return (
-                  <div
+                  <button
                     key={idx}
                     role='button'
                     tabIndex={0}
+                    disabled={uploadingOverall || clearingOverall}
                     onClick={() => handleImageClick(displayUrl, img.label)}
                     onKeyDown={(e) =>
                       handleImageKeyPress(e, displayUrl, img.label)
                     }
-                    className='w-[120px] sm:w-[140px] md:w-[180px] flex-shrink-0 select-none relative bg-[#16202f] sm:p-2 p-1 rounded-lg cursor-pointer border border-gray-700 hover:shadow-[0px_0px_0px_0px_#030712] shadow-[5px_5px_0px_0px_#030712] duration-500 overflow-hidden group'
+                    className={`w-[120px] sm:w-[140px] md:w-[180px] flex-shrink-0 select-none relative bg-[#16202f] sm:p-2 p-1 rounded-lg  border border-gray-700 shadow-[5px_5px_0px_0px_#030712] duration-500 overflow-hidden group ${
+                      uploadingOverall || clearingOverall
+                        ? 'cursor-not-allowed'
+                        : 'cursor-pointer hover:shadow-[0px_0px_0px_0px_#030712]'
+                    }`}
                     aria-label={`Preview image: ${
                       img.label || `Physique Image ${idx + 1}`
                     }`}
@@ -496,7 +514,11 @@ export default function MeasurementModal({
                     <img
                       src={displayUrl}
                       alt={img.label || `Physique Image ${idx + 1}`}
-                      className='w-full h-[100px] xs:h-[120px] sm:h-[140px] md:h-[180px] object-cover rounded-md xs:mb-2 transition-transform duration-300 group-hover:scale-105'
+                      className={`w-full h-[100px] xs:h-[120px] sm:h-[140px] md:h-[180px] object-cover rounded-md xs:mb-2 transition-transform duration-300  ${
+                        uploadingOverall || clearingOverall
+                          ? ''
+                          : 'group-hover:scale-105 '
+                      }`}
                       onError={(e) => {
                         e.target.onerror = null
                         e.target.src =
@@ -508,7 +530,7 @@ export default function MeasurementModal({
                         {img.label}
                       </p>
                     )}
-                  </div>
+                  </button>
                 )
               })}
             </div>
@@ -550,7 +572,7 @@ export default function MeasurementModal({
         >
           {uploadingOverall ? (
             <span className='items-center flex gap-2 justify-center'>
-              Uploading
+              Saving
               <span className='flex animate-spin w-4 h-4 border-2 border-t-transparent border-gray-300 rounded-full'></span>
             </span>
           ) : (
@@ -562,7 +584,7 @@ export default function MeasurementModal({
         </button>
       </div>
 
-      {showImagePreview && (
+      {showImagePreview && (!uploadingOverall || !clearingOverall) && (
         <ImagePreviewModal
           imageUrl={previewImageUrl}
           imageLabel={previewImageLabel}
@@ -594,6 +616,53 @@ export default function MeasurementModal({
               className='px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950'
             >
               Clear Data
+            </button>
+          </div>
+        </Modal>
+      )}
+      {showConfirmDeleteImage && (
+        <Modal
+          onClose={() => setShowConfirmDeleteImage(false)}
+          disableClose={uploadingOverall || clearingOverall}
+        >
+          <h3 className='text-lg sm:text-xl font-bold text-blue-400 mb-4 mr-[34px]'>
+            Confirm Delete Image
+          </h3>
+          <p className='text-gray-200 mb-6 text-sm sm:text-base'>
+            Are you sure you want to delete image "{deleteName}"?
+          </p>
+          <div className='flex justify-end space-x-3'>
+            <button
+              disabled={uploadingOverall || clearingOverall}
+              onClick={() => setShowConfirmDeleteImage(false)}
+              className={`px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base  text-white rounded-md  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 ${
+                uploadingOverall || clearingOverall
+                  ? 'bg-gray-800'
+                  : 'bg-gray-900 hover:bg-gray-700'
+              }`}
+            >
+              Cancel
+            </button>
+            <button
+              disabled={uploadingOverall || clearingOverall}
+              onClick={() => handleRemoveImageField(deleteIndex)}
+              className={`px-2 py-1 sm:px-4 sm:py-2 text-sm sm:text-base  text-white rounded-md  transition-colors shadow-[4px_4px_0px_0px_#030712] border border-gray-950 ${
+                uploadingOverall || clearingOverall
+                  ? 'bg-red-900'
+                  : 'bg-red-600 hover:bg-red-700'
+              }`}
+            >
+              {uploadingOverall || clearingOverall ? (
+                <span className='items-center flex gap-2 justify-center'>
+                  Deleting
+                  <span className='flex animate-spin w-4 h-4 border-2 border-t-transparent border-gray-300 rounded-full'></span>
+                </span>
+              ) : (
+                <span className='items-center flex gap-2 justify-center'>
+                  <FaTrash />
+                  Delete Image
+                </span>
+              )}
             </button>
           </div>
         </Modal>

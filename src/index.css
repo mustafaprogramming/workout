@@ -68,7 +68,9 @@ html {
 .overflow-x-scroll::-webkit-scrollbar-track {
   background: #111827;
 }
-
+.small-scrollbar::-webkit-scrollbar {
+  height: 3px;
+}
 .animate-trash {
   opacity: 0;
   transform: scale(0);

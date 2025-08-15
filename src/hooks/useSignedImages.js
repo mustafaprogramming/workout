@@ -22,9 +22,9 @@ export function useSignedImages(publicIds = [], docIds) {
   }, [])
 
   const fetchWithTimeout = useCallback(
-    (publicId, docId, timeout = 40000) =>
+    (publicId, docId, timeout = 40000, opts = {}) =>
       Promise.race([
-        fetchSignedImage(publicId, docId),
+        fetchSignedImage(publicId, docId, opts),
         new Promise((_, reject) =>
           setTimeout(
             () => reject(new Error(`Timeout after ${timeout}ms`)),
@@ -36,13 +36,13 @@ export function useSignedImages(publicIds = [], docIds) {
   )
 
   const fetchWithRetry = useCallback(
-    async (publicId, docId, retries = 2) => {
+    async (publicId, docId, retries = 2, opts = {}) => {
       try {
-        return await fetchWithTimeout(publicId, docId)
+        return await fetchWithTimeout(publicId, docId, 40000, opts)
       } catch (e) {
         if (retries > 0) {
           await new Promise((res) => setTimeout(res, 1000))
-          return fetchWithRetry(publicId, docId, retries - 1)
+          return fetchWithRetry(publicId, docId, retries - 1, opts)
         }
         console.error(`Failed after retries: ${publicId}`, e.message)
         return null
@@ -52,10 +52,9 @@ export function useSignedImages(publicIds = [], docIds) {
   )
 
   const fetchSingle = useCallback(
-    async (publicId, docId, index) => {
+    async (publicId, docId, index, opts = {}) => {
       const key = `${publicId}|${docId}`
       const cached = cacheRef.current[key]
-      
 
       if (cached?.deleted) {
         setUrls((prev) => {
@@ -66,7 +65,7 @@ export function useSignedImages(publicIds = [], docIds) {
         return
       }
 
-      const url = await fetchWithRetry(publicId, docId)
+      const url = await fetchWithRetry(publicId, docId, 2, opts)
       if (!isMountedRef.current) return
 
       setUrls((prev) => {
@@ -75,20 +74,30 @@ export function useSignedImages(publicIds = [], docIds) {
         return copy
       })
 
-      // Schedule refresh if cache exists
-      const expiresAt = cached?.expiresAt
-      if (expiresAt) {
-        const now = Math.floor(Date.now() / 1000)
-        const refreshEarly = Math.floor((expiresAt - now) * 0.1) || 5
-        const msUntilRefresh = Math.max(
-          (expiresAt - now - refreshEarly) * 1000,
-          2000
-        )
+      // Schedule refresh if cache exists and this was not already a refresh call
+      const expiresAt = cacheRef.current[key]?.expiresAt
+      const dateThen = cacheRef.current[key]?.dateThen
 
-        if (refreshTimersRef.current[key])
+      if (expiresAt && dateThen && !opts.forceRefresh) {
+        const expire = expiresAt - dateThen // total lifetime in seconds
+        const now = Math.floor(Date.now() / 1000)
+        const refreshEarly = Math.floor(expire * 0.05) || 5 // refresh 5% early, min 5s
+        let msUntilRefresh = (expiresAt - now - refreshEarly) * 1000
+
+        // If already expired or too close to expiry, refresh immediately
+        if (msUntilRefresh <= 0) {
+          fetchSingle(publicId, docId, index, { forceRefresh: true })
+          return
+        }
+
+        // Clear any existing timer for this key
+        if (refreshTimersRef.current[key]) {
           clearTimeout(refreshTimersRef.current[key])
+        }
+        // Schedule refresh
         refreshTimersRef.current[key] = setTimeout(() => {
-          fetchSingle(publicId, docId, index)
+          fetchSingle(publicId, docId, index, { forceRefresh: true })
+          refreshTimersRef.current[key] = null
         }, msUntilRefresh)
       }
     },
@@ -100,9 +109,7 @@ export function useSignedImages(publicIds = [], docIds) {
       const docId = Array.isArray(docIds) ? docIds[index] : docIds
       if (!publicId || !docId) return
 
-      const key = `${publicId}|${docId}`
-      const cached = cacheRef.current[key]
-      
+      const cached = cacheRef.current[`${publicId}|${docId}`]
       if (cached?.deleted) return
 
       fetchSingle(publicId, docId, index)

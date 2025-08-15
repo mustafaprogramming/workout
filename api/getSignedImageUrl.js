@@ -92,7 +92,7 @@ export default async function handler(req, res) {
         }
       }
     }
-    
+
     if (!imageFound) {
       console.warn(
         `[getSignedImageUrl] Ownership check failed for publicId=${decodedPublicId}`
@@ -111,7 +111,9 @@ export default async function handler(req, res) {
         .json({ message: 'Image format not found in metadata.' })
     }
 
-    const expiresAt = Math.floor(Date.now() / 1000) + 60 // 1 hour expiry
+    const expiresAt = Math.floor(Date.now() / 1000) + 3600 // 1 hour expiry
+    const dateThen = Math.floor(Date.now() / 1000)
+
     const signedUrl = cloudinary.utils.private_download_url(
       decodedPublicId,
       fileFormat,
@@ -121,7 +123,11 @@ export default async function handler(req, res) {
       }
     )
 
-    return res.status(200).json({ url: signedUrl, expiresAt })
+    return res.status(200).json({
+      url: signedUrl,
+      expiresAt,
+      dateThen: dateThen,
+    })
   } catch (error) {
     console.error('Error in /api/getSignedImageUrl:', error)
     return res.status(500).json({ message: 'Internal Server Error' })
