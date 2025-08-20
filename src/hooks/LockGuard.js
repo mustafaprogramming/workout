@@ -18,7 +18,7 @@ export function useLockGuard({ isAuthReady, userId, lockProtectionEnabled }) {
       setIsLocked(false)
       return
     }
-    
+
     if (!sessionStarted) {
       sessionStarted = true
       const navEntry = performance.getEntriesByType('navigation')[0]
@@ -52,7 +52,7 @@ export function useLockGuard({ isAuthReady, userId, lockProtectionEnabled }) {
         const lastHidden = Number(localStorage.getItem('appLastHidden')) || 0
         const now = Date.now()
         const elapsed = now - lastHidden
-        if (elapsed > 10000) {
+        if (elapsed > 30000) {
           setIsLocked(true)
           localStorage.removeItem('appLastOpened')
         }

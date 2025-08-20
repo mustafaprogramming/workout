@@ -1,16 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useMessage } from '../context/MessageContext'
-import {
-  FaBackward,
-  FaChevronDown,
-  FaChevronUp,
-  FaEdit,
-  FaMinus,
-  FaPlus,
-  FaRegClock,
-  FaSave,
-  FaTrash,
-} from 'react-icons/fa'
+import { FaEdit, FaMinus, FaPlus, FaSave, FaTrash } from 'react-icons/fa'
 export default function WorkoutPlanCard({
   planId, // New prop: unique ID for the plan
   planName, // New prop: name of the plan
@@ -19,6 +9,8 @@ export default function WorkoutPlanCard({
   onEditToggle, // Toggles editing for this specific plan
   onSaveExercises, // Renamed from onSave, specifically for exercises
   onDeletePlan, // New prop: to delete the entire plan
+  workoutPlanCard,
+  setWorkoutPlanCard,
 }) {
   const [editableExercises, setEditableExercises] = useState([])
   const [editablePlanName, setEditablePlanName] = useState(planName) // Local state for editing name
@@ -38,7 +30,6 @@ export default function WorkoutPlanCard({
       setEditablePlanName(planName)
     }
   }, [isEditing, exercises, planName]) // Added planName to dependencies
-
 
   const handleAddExercise = () => {
     setEditableExercises((prev) => [
@@ -132,21 +123,32 @@ export default function WorkoutPlanCard({
 
   return (
     <div className='bg-gray-900 shadow-[2px_2px_0px_0px_#030712] xs:shadow-[5px_5px_0px_0px_#030712] border border-gray-950 p-2 sm:py-4 rounded-lg mb-3'>
-      <h4 className='sm:text-base md:text-xl text-sm font-semibold text-blue-300 capitalize flex-grow px-2 sm:px-4 mt-2 sm:mt-4'>
-        {isEditing ? (
-          <input
-            type='text'
-            id={`${planId}-name-input`}
-            value={editablePlanName}
-            onChange={(e) => setEditablePlanName(e.target.value)}
-            className='w-full bg-gray-700 shadow-[2px_2px_0px_0px_#030712] border border-gray-950 rounded-md sm:p-2 p-1 text-gray-100'
-            placeholder='Plan Name'
-            onClick={(e) => e.stopPropagation()} // Prevent card expansion when clicking input
-          />
-        ) : (
-          editablePlanName
-        )}
-      </h4>
+      <div
+        className='px-2 
+sm:px-4 mt-2  flex items-center'
+      >
+        <h4 className='md:text-xl sm:text-lg xs:text-base text-sm font-semibold text-blue-300 capitalize flex-grow '>
+          {isEditing ? (
+            <input
+              type='text'
+              id={`${planId}-name-input`}
+              value={editablePlanName}
+              onChange={(e) => setEditablePlanName(e.target.value)}
+              className='w-full bg-gray-700 shadow-[2px_2px_0px_0px_#030712] border border-gray-950 rounded-md sm:p-2 p-1 text-gray-100'
+              placeholder='Plan Name'
+              onClick={(e) => e.stopPropagation()} // Prevent card expansion when clicking input
+            />
+          ) : (
+            editablePlanName
+          )}
+        </h4>
+        <button
+          className={`px-2 sm:py-1 py-0.5 sm:px-4 bg-red-600 hover:bg-red-700 text-white rounded-md  transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950 text-xs xs:text-sm sm:text-base`}
+          onClick={() => setWorkoutPlanCard(null)}
+        >
+          close
+        </button>
+      </div>
 
       <div className='mt-4'>
         {/* "No exercises added" message */}

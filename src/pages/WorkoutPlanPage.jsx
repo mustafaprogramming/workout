@@ -49,7 +49,23 @@ export default function WorkoutPlanPage() {
   const [planToDeleteName, setPlanToDeleteName] = useState('')
   // --- END NEW STATE ---
   const [searchTerm, setSearchTerm] = useState('')
-  const [workoutPlanCard, setWorkoutPlanCard] = useState(null)
+
+  let localPlanRaw = localStorage.getItem('openPlan')
+  let localPlan = null
+  try {
+    if (
+      localPlanRaw &&
+      localPlanRaw !== 'undefined' &&
+      localPlanRaw !== 'null'
+    ) {
+      localPlan = JSON.parse(localPlanRaw)
+    }
+  } catch (e) {
+    console.error('Failed to parse localPlan:', e)
+  }
+
+  const [workoutPlanCard, setWorkoutPlanCard] = useState(localPlan || null)
+
   const appId =
     import.meta.env.VITE_FIREBASE_APP_ID || 'workout-tracker-app-local'
 
@@ -150,7 +166,14 @@ export default function WorkoutPlanPage() {
   useEffect(() => {
     if (workoutPlanCard) {
       const plan = workoutPlans.find((plan) => plan.id === workoutPlanCard.id)
-      setWorkoutPlanCard(plan)
+
+      if (plan) {
+        setWorkoutPlanCard(plan)
+        localStorage.setItem('openPlan', JSON.stringify(plan))
+      }
+    } else {
+      localStorage.removeItem('openPlan')
+      setWorkoutPlanCard(null)
     }
   }, [workoutPlanCard, workoutPlans])
   // --- UPDATED: handleDeletePlan to show confirmation modal ---
@@ -183,7 +206,6 @@ export default function WorkoutPlanPage() {
       setShowConfirmDeleteModal(false) // Close the modal
       setPlanToDeleteId(null) // Clear ID
       setPlanToDeleteName('') // Clear name
-      
     } catch (e) {
       console.error('Error deleting workout plan:', e)
       setMessage('Failed to delete workout plan.')
@@ -477,6 +499,8 @@ export default function WorkoutPlanPage() {
           }
           onSaveExercises={handleSaveWorkoutPlan} // Pass the updated save handler
           onDeletePlan={(id) => handleDeletePlan(id, workoutPlanCard.name)} // Pass planId and planName to handler
+          setWorkoutPlanCard={setWorkoutPlanCard}
+          workoutPlanCard={workoutPlanCard}
           aria-label={`Workout plan for ${workoutPlanCard.name}`}
         />
       )}
