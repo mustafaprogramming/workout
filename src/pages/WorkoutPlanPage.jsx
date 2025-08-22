@@ -82,6 +82,51 @@ export default function WorkoutPlanPage() {
 
     return () => unsubscribe()
   }, [db, userId, isAuthReady, appId])
+  useEffect(() => {
+    let localPlanRaw = localStorage.getItem('openPlan')
+    let localPlan = null
+    try {
+      if (
+        localPlanRaw &&
+        localPlanRaw !== 'undefined' &&
+        localPlanRaw !== 'null'
+      ) {
+        localPlan = JSON.parse(localPlanRaw)
+      }
+    } catch (e) {
+      console.error('Failed to parse localPlan:', e)
+    }
+
+    if (!workoutPlanCard && !localPlan) return
+
+    if (localPlan && !workoutPlanCard) {
+      setWorkoutPlanCard(localPlan)
+    } else if (workoutPlanCard && !localPlan) {
+      localStorage.setItem(
+        'openPlan',
+        JSON.stringify({ id: workoutPlanCard?.id, ...workoutPlanCard })
+      )
+    } else if (
+      workoutPlanCard &&
+      localPlan &&
+      workoutPlanCard?.id !== localPlan?.id
+    ) {
+      localStorage.setItem(
+        'openPlan',
+        JSON.stringify({ id: workoutPlanCard?.id, ...workoutPlanCard })
+      )
+    }
+    localPlan = JSON.parse(localStorage.getItem('openPlan'))
+
+    const plan = workoutPlans.find((plan) => {
+      return plan.id === localPlan?.id
+    })
+
+    if (plan) {
+      setWorkoutPlanCard(plan)
+      localStorage.setItem('openPlan', JSON.stringify(plan))
+    }
+  }, [workoutPlanCard, workoutPlans])
 
   const handleAddPlan = async () => {
     if (!db || !userId) return
@@ -149,36 +194,11 @@ export default function WorkoutPlanPage() {
       }
     }
   }
-  useEffect(() => {
-    let localPlanRaw = localStorage.getItem('openPlan')
-    let localPlan = null
-    try {
-      if (
-        localPlanRaw &&
-        localPlanRaw !== 'undefined' &&
-        localPlanRaw !== 'null'
-      ) {
-        localPlan = JSON.parse(localPlanRaw)
-      }
-    } catch (e) {
-      console.error('Failed to parse localPlan:', e)
-    }
-    console.log(workoutPlanCard, localPlan)
-    if (workoutPlanCard || localPlan) {
-      const plan = workoutPlans.find(
-        (plan) => plan.id === workoutPlanCard?.id || localPlan?.id
-      )
+  const removeWorkoutPlan = () => {
+    setWorkoutPlanCard(null)
+    localStorage.removeItem('openPlan')
+  }
 
-      if (plan) {
-        setWorkoutPlanCard(plan)
-        localStorage.setItem('openPlan', JSON.stringify(plan))
-      }
-    } else {
-      console.log('ran')
-      localStorage.removeItem('openPlan')
-      setWorkoutPlanCard(null)
-    }
-  }, [workoutPlanCard, workoutPlans])
   // --- UPDATED: handleDeletePlan to show confirmation modal ---
   const handleDeletePlan = (planId, planName) => {
     setPlanToDeleteId(planId)
@@ -209,8 +229,7 @@ export default function WorkoutPlanPage() {
       setShowConfirmDeleteModal(false) // Close the modal
       setPlanToDeleteId(null) // Clear ID
       setPlanToDeleteName('') // Clear name
-      localStorage.removeItem('openPlan')
-      setWorkoutPlanCard(null)
+      removeWorkoutPlan()
     } catch (e) {
       console.error('Error deleting workout plan:', e)
       setMessage('Failed to delete workout plan.')
@@ -229,16 +248,25 @@ export default function WorkoutPlanPage() {
     setTimerSeconds(duration)
     setShowTimer(true)
   }
+
   const searchedPlan = useMemo(() => {
     let filtered = workoutPlans
+
     if (searchTerm) {
       const lowerCaseSearchTerm = searchTerm.toLowerCase()
       filtered = filtered.filter((plan) =>
         plan.name.toLowerCase().includes(lowerCaseSearchTerm)
       )
     }
-    return filtered
+
+    // Sort by first letter of plan.name, case-insensitive
+    return filtered.sort((a, b) => {
+      const firstA = a.name[0].toLowerCase()
+      const firstB = b.name[0].toLowerCase()
+      return firstA.localeCompare(firstB)
+    })
   }, [workoutPlans, searchTerm])
+
   return (
     <div className='bg-gray-800 shadow-[5px_5px_0px_0px_#030712] border border-gray-950 sm:p-6 xs:p-3 p-2 rounded-xl  text-gray-100'>
       <h2 className='sm:text-2xl text-xl font-bold text-blue-400 mb-6 mt-2'>
@@ -504,10 +532,7 @@ export default function WorkoutPlanPage() {
           }
           onSaveExercises={handleSaveWorkoutPlan} // Pass the updated save handler
           onDeletePlan={(id) => handleDeletePlan(id, workoutPlanCard.name)} // Pass planId and planName to handler
-          setWorkoutPlanCard={() => {
-            localStorage.removeItem('openPlan')
-            setWorkoutPlanCard(null)
-          }}
+          removeWorkoutPlan={removeWorkoutPlan}
           workoutPlanCard={workoutPlanCard}
           aria-label={`Workout plan for ${workoutPlanCard.name}`}
         />
@@ -567,10 +592,8 @@ export default function WorkoutPlanPage() {
                     }  text-white rounded-md  transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950 text-xs xs:text-sm sm:text-base`}
                     onClick={() => {
                       if (workoutPlanCard?.id === plan.id) {
-                        localStorage.removeItem('openPlan')
-                        setWorkoutPlanCard(null)
+                        removeWorkoutPlan()
                       } else {
-                        localStorage.removeItem('openPlan')
                         setWorkoutPlanCard(plan)
                       }
                     }}

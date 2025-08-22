@@ -9,8 +9,7 @@ export default function WorkoutPlanCard({
   onEditToggle, // Toggles editing for this specific plan
   onSaveExercises, // Renamed from onSave, specifically for exercises
   onDeletePlan, // New prop: to delete the entire plan
-  workoutPlanCard,
-  setWorkoutPlanCard,
+  removeWorkoutPlan,
 }) {
   const [editableExercises, setEditableExercises] = useState([])
   const [editablePlanName, setEditablePlanName] = useState(planName) // Local state for editing name
@@ -144,7 +143,7 @@ sm:px-4 mt-2  flex items-center'
         </h4>
         <button
           className={`px-2 sm:py-1 py-0.5 sm:px-4 bg-red-600 hover:bg-red-700 text-white rounded-md  transition-colors shadow-[3px_3px_0px_0px_#030712] border border-gray-950 text-xs xs:text-sm sm:text-base ml-2`}
-          onClick={setWorkoutPlanCard}
+          onClick={removeWorkoutPlan}
         >
           close
         </button>
